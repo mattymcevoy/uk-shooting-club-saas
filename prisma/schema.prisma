@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// Base & Membership Models
+// ==========================================
+
+enum MembershipTier {
+  GUEST
+  PROBATIONARY
+  FULL_MEMBER
+  JUNIOR
+  VIP
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  IN_ARREARS
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Membership & Financials
+  membershipTier   MembershipTier @default(GUEST)
+  status           AccountStatus  @default(ACTIVE)
+  stripeCustomerId String?        @unique
+
+  // Relations
+  subscriptions Subscription[]
+  invoices      Invoice[]
+  bookings      Booking[]
+}
+
+// ==========================================
+// Financial & Billing Models
+// ==========================================
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  TRIALING
+}
+
+model Subscription {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  stripeSubscriptionId String             @unique
+  status               SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean            @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum InvoiceStatus {
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+}
+
+model Invoice {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  stripeInvoiceId String?       @unique
+  amount          Int // Stored in smallest currency unit (e.g., pence)
+  currency        String        @default("GBP")
+  status          InvoiceStatus @default(OPEN)
+  description     String?
+
+  createdAt DateTime @default(now())
+}
+
+// ==========================================
+// Facility & Booking Models
+// ==========================================
+
+model Facility {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  capacity    Int     @default(1) // Number of lanes, pegs, or total slots
+
+  // Pricing (in pence)
+  baseRate   Int @default(0) // Rate for Guests/Probationary
+  memberRate Int @default(0) // Discounted rate for Full Members
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bookings Booking[]
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  ATTENDED
+}
+
+model Booking {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  facilityId String
+  facility   Facility @relation(fields: [facilityId], references: [id])
+
+  startTime DateTime
+  endTime   DateTime
+  status    BookingStatus @default(PENDING)
+
+  paymentIntentId String? // Stripe PaymentIntent for standalone bookings
+  amountPaid      Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([facilityId, startTime, endTime])
+}
