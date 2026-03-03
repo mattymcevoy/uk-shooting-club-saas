@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Target, CheckCircle, ArrowRight, Building2, User } from 'lucide-react';
 
@@ -13,8 +13,29 @@ export default function B2BRegisterPage() {
         clubName: '',
         ownerName: '',
         ownerEmail: '',
-        billingCycle: 'monthly', // 'monthly' | 'annual'
+        platformPlanId: '', // Dynamic SaaS Plan
+        billingCycle: 'monthly' as 'monthly' | 'annual',
     });
+
+    const [plans, setPlans] = useState<any[]>([]);
+
+    // Fetch Global SaaS Plans from DB
+    // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
+    useEffect(() => {
+        const fetchPlans = async () => {
+            try {
+                const res = await fetch('/api/admin/super/pricing');
+                const data = await res.json();
+                setPlans(data);
+                if (data.length > 0) {
+                    setFormData(prev => ({ ...prev, platformPlanId: data[0].id }));
+                }
+            } catch (err) {
+                console.error("Failed to load SaaS plans", err);
+            }
+        };
+        fetchPlans();
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -138,27 +159,43 @@ export default function B2BRegisterPage() {
 
                         <div className="pt-2">
                             <label className="block text-sm font-medium text-gray-300 mb-3">SaaS Licensing Tier</label>
-                            <div className="grid grid-cols-2 gap-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setFormData({ ...formData, billingCycle: 'monthly' })}
-                                    className={`py-4 rounded-xl border flex flex-col items-center justify-center transition-all ${formData.billingCycle === 'monthly' ? 'bg-emerald-500/20 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-black/20 border-white/10 hover:border-white/30 text-gray-400'}`}
-                                >
-                                    <span className={`font-bold ${formData.billingCycle === 'monthly' ? 'text-white' : ''}`}>Monthly</span>
-                                    <span className="text-sm mt-1">£199 / mo</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setFormData({ ...formData, billingCycle: 'annual' })}
-                                    className={`py-4 rounded-xl border flex flex-col items-center justify-center transition-all ${formData.billingCycle === 'annual' ? 'bg-emerald-500/20 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-black/20 border-white/10 hover:border-white/30 text-gray-400'}`}
-                                >
-                                    <span className={`font-bold flex items-center space-x-2 ${formData.billingCycle === 'annual' ? 'text-white' : ''}`}>
-                                        <span>Annual</span>
-                                        <span className="text-[9px] uppercase tracking-wider bg-emerald-500 text-emerald-950 px-1.5 py-0.5 rounded-full font-bold">Save 20%</span>
-                                    </span>
-                                    <span className="text-sm mt-1">£1,900 / yr</span>
-                                </button>
-                            </div>
+
+                            {plans.length === 0 ? (
+                                <div className="text-center p-4 bg-white/5 border border-white/10 rounded-xl text-gray-400 text-sm">
+                                    No SaaS plans configured.
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {plans.map(plan => (
+                                        <div key={plan.id} className={`border rounded-xl p-4 transition-all cursor-pointer ${formData.platformPlanId === plan.id ? 'bg-emerald-500/10 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.15)]' : 'bg-black/20 border-white/10 hover:border-white/30'}`} onClick={() => setFormData({ ...formData, platformPlanId: plan.id })}>
+                                            <div className="flex justify-between items-center mb-4">
+                                                <div>
+                                                    <h3 className={`font-bold ${formData.platformPlanId === plan.id ? 'text-emerald-400' : 'text-white'}`}>{plan.name}</h3>
+                                                    <p className="text-xs text-gray-400 mt-1">{plan.description}</p>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); setFormData({ ...formData, platformPlanId: plan.id, billingCycle: 'monthly' }); }}
+                                                    className={`py-3 rounded-lg border flex flex-col items-center justify-center transition-all ${formData.platformPlanId === plan.id && formData.billingCycle === 'monthly' ? 'bg-emerald-500 text-emerald-950 border-emerald-400 font-bold' : 'bg-black/30 border-white/5 text-gray-400 hover:text-white'}`}
+                                                >
+                                                    <span className="text-sm">Monthly</span>
+                                                    <span>£{(plan.monthlyPrice / 100).toFixed(2)}</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); setFormData({ ...formData, platformPlanId: plan.id, billingCycle: 'annual' }); }}
+                                                    className={`py-3 rounded-lg border flex flex-col items-center justify-center transition-all ${formData.platformPlanId === plan.id && formData.billingCycle === 'annual' ? 'bg-emerald-500 text-emerald-950 border-emerald-400 font-bold' : 'bg-black/30 border-white/5 text-gray-400 hover:text-white'}`}
+                                                >
+                                                    <span className="text-sm">Annual <span className="text-[10px] ml-1 opacity-70">(-20%)</span></span>
+                                                    <span>£{(plan.annualPrice / 100).toFixed(2)}</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <button

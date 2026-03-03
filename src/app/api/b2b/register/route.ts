@@ -5,10 +5,16 @@ import { stripe } from '@/lib/stripe';
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { clubName, ownerName, ownerEmail, billingCycle } = body;
+        const { clubName, ownerName, ownerEmail, platformPlanId, billingCycle } = body;
 
-        if (!clubName || !ownerName || !ownerEmail) {
-            return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
+        if (!clubName || !ownerName || !ownerEmail || !platformPlanId) {
+            return NextResponse.json({ error: 'All fields including a SaaS Plan are required' }, { status: 400 });
+        }
+
+        // Fetch the Global SaaS Plan from DB
+        const plan = await prisma.platformPlan.findUnique({ where: { id: platformPlanId } });
+        if (!plan) {
+            return NextResponse.json({ error: 'Selected SaaS plan is invalid' }, { status: 400 });
         }
 
         // 1. Create the B2B Organization (Tenant)
@@ -47,8 +53,8 @@ export async function POST(req: Request) {
             data: { stripeCustomerId: customer.id }
         });
 
-        // 4. Create Stripe Checkout Session for the Software License
-        const unitAmount = billingCycle === 'monthly' ? 19900 : 190000; // £199/mo or £1900/yr
+        // 4. Create Stripe Checkout Session for the Software License using dynamic plan pricing
+        const unitAmount = billingCycle === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
 
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
@@ -59,8 +65,8 @@ export async function POST(req: Request) {
                     price_data: {
                         currency: 'gbp',
                         product_data: {
-                            name: `Shooting Club SaaS Platform - ${billingCycle.toUpperCase()} License`,
-                            description: 'Full white-label platform access with automated bookings, digital QR cards, and CRM.',
+                            name: `Shooting Club SaaS - ${plan.name} (${billingCycle.toUpperCase()})`,
+                            description: plan.description || 'Full white-label platform access.',
                         },
                         unit_amount: unitAmount,
                         recurring: {

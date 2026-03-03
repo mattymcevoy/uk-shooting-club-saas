@@ -30,6 +30,7 @@ model Organization {
   bookings    Booking[]
   invoices    Invoice[]
   subscriptions Subscription[]
+  membershipPlans MembershipPlan[]
 }
 
 // ==========================================
@@ -223,4 +224,46 @@ model Event {
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// ==========================================
+// Phase 9: Dynamic Subscription Pricing
+// ==========================================
+
+model PlatformPlan {
+  id          String   @id @default(cuid())
+  name        String   // e.g "Standard SaaS License"
+  description String?
+  
+  monthlyPrice Int      // Stored in pence (£199.00 = 19900)
+  annualPrice  Int      // Stored in pence (£1900.00 = 190000)
+  
+  stripeMonthlyPriceId String?
+  stripeAnnualPriceId  String?
+  
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MembershipPlan {
+  id          String   @id @default(cuid())
+  
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  name        String   // e.g "Full Member", "VIP", "Junior"
+  description String?
+  
+  monthlyPrice Int      // Stored in pence (£45.00 = 4500)
+  annualPrice  Int      // Stored in pence (£450.00 = 45000)
+  
+  stripeMonthlyPriceId String?
+  stripeAnnualPriceId  String?
+  
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([name, organizationId])
 }

@@ -18,9 +18,28 @@ export default function JoinUs() {
         phone: '',
         address: '',
         certificateNumber: '',
-        membershipTier: 'FULL_MEMBER',
-        billingCycle: 'monthly' // or 'annual'
+        membershipTier: '', // Now stores the dynamic Plan ID
+        billingCycle: 'monthly' as 'monthly' | 'annual'
     });
+
+    const [plans, setPlans] = useState<any[]>([]);
+
+    useEffect(() => {
+        // Fetch dynamic membership tiers
+        const fetchPlans = async () => {
+            try {
+                const res = await fetch('/api/admin/settings/pricing');
+                const data = await res.json();
+                setPlans(data);
+                if (data.length > 0) {
+                    setFormData(prev => ({ ...prev, membershipTier: data[0].id }));
+                }
+            } catch (err) {
+                console.error("Failed to load plans", err);
+            }
+        };
+        fetchPlans();
+    }, []);
 
     // File State
     const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
@@ -305,45 +324,36 @@ export default function JoinUs() {
                             </div>
 
                             <div className="space-y-4">
-                                {/* Full Member Option */}
-                                <button
-                                    type="button"
-                                    onClick={() => setFormData({ ...formData, membershipTier: 'FULL_MEMBER' })}
-                                    className={`w-full text-left p-6 rounded-2xl border-2 transition-all ${formData.membershipTier === 'FULL_MEMBER' ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:border-gray-200 bg-white'}`}
-                                >
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <h3 className="font-bold text-lg text-gray-900">Full Membership</h3>
-                                            <p className="text-sm text-gray-500 mt-1">Complete facility access and discounted peg rates.</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="font-extrabold text-xl text-emerald-600">
-                                                {formData.billingCycle === 'monthly' ? '£45' : '£450'}
-                                            </div>
-                                            <div className="text-xs text-gray-400">/{formData.billingCycle === 'monthly' ? 'mo' : 'yr'}</div>
-                                        </div>
+                                {plans.length === 0 ? (
+                                    <div className="p-8 text-center bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl">
+                                        No membership plans are currently available. Please contact the club.
                                     </div>
-                                </button>
-
-                                {/* VIP Option */}
-                                <button
-                                    type="button"
-                                    onClick={() => setFormData({ ...formData, membershipTier: 'VIP' })}
-                                    className={`w-full text-left p-6 rounded-2xl border-2 transition-all ${formData.membershipTier === 'VIP' ? 'border-purple-500 bg-purple-50' : 'border-gray-100 hover:border-gray-200 bg-white'}`}
-                                >
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <h3 className="font-bold text-lg text-purple-900">VIP Membership</h3>
-                                            <p className="text-sm text-gray-500 mt-1">Priority booking, complimentary guest passes.</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="font-extrabold text-xl text-purple-600">
-                                                {formData.billingCycle === 'monthly' ? '£100' : '£1000'}
+                                ) : (
+                                    plans.map(plan => (
+                                        <button
+                                            key={plan.id}
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, membershipTier: plan.id })}
+                                            className={`w-full text-left p-6 rounded-2xl border-2 transition-all ${formData.membershipTier === plan.id
+                                                    ? 'border-emerald-500 bg-emerald-50'
+                                                    : 'border-gray-100 hover:border-gray-200 bg-white'
+                                                }`}
+                                        >
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <h3 className={`font-bold text-lg ${formData.membershipTier === plan.id ? 'text-emerald-900' : 'text-gray-900'}`}>{plan.name}</h3>
+                                                    <p className="text-sm text-gray-500 mt-1">{plan.description}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className={`font-extrabold text-xl ${formData.membershipTier === plan.id ? 'text-emerald-600' : 'text-gray-900'}`}>
+                                                        £{((formData.billingCycle === 'monthly' ? plan.monthlyPrice : plan.annualPrice) / 100).toFixed(2)}
+                                                    </div>
+                                                    <div className="text-xs text-gray-400">/{formData.billingCycle === 'monthly' ? 'mo' : 'yr'}</div>
+                                                </div>
                                             </div>
-                                            <div className="text-xs text-gray-400">/{formData.billingCycle === 'monthly' ? 'mo' : 'yr'}</div>
-                                        </div>
-                                    </div>
-                                </button>
+                                        </button>
+                                    ))
+                                )}
                             </div>
                         </div>
                     )}
