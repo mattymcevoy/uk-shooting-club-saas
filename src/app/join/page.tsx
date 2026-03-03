@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { upload } from '@vercel/blob/client';
-import { CheckCircle, UploadCloud, Camera, User, FileText, ChevronRight } from 'lucide-react';
+import { CheckCircle, UploadCloud, Camera, User, FileText, ChevronRight, X, Aperture } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function JoinUs() {
@@ -27,6 +27,63 @@ export default function JoinUs() {
     const [certificateDoc, setCertificateDoc] = useState<File | null>(null);
 
     const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+
+    // Camera Integration State
+    const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+
+    // Ensure camera turns off if component unmounts
+    useEffect(() => {
+        return () => stopCamera();
+    }, []);
+
+    const startCamera = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+            setIsCameraOpen(true);
+            // small delay to let the UI mount the <video> tag
+            setTimeout(() => {
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                    videoRef.current.play();
+                }
+            }, 100);
+        } catch (err) {
+            console.error("Camera access denied:", err);
+            alert("Could not access camera. Please allow permissions or use manual upload.");
+        }
+    };
+
+    const stopCamera = () => {
+        if (videoRef.current && videoRef.current.srcObject) {
+            const stream = videoRef.current.srcObject as MediaStream;
+            stream.getTracks().forEach(track => track.stop());
+            videoRef.current.srcObject = null;
+        }
+        setIsCameraOpen(false);
+    };
+
+    const capturePhoto = () => {
+        if (videoRef.current && canvasRef.current) {
+            const video = videoRef.current;
+            const canvas = canvasRef.current;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        const file = new File([blob], `profile_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                        setProfilePhoto(file);
+                        setPhotoPreview(URL.createObjectURL(file));
+                        stopCamera();
+                    }
+                }, 'image/jpeg', 0.9);
+            }
+        }
+    };
 
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -147,27 +204,60 @@ export default function JoinUs() {
                         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
 
                             {/* Camera / Photo Upload */}
-                            <div className="bg-gray-50 rounded-2xl p-6 border-2 border-dashed border-gray-200 text-center relative hover:border-emerald-400 transition-colors">
-                                <label className="cursor-pointer block">
-                                    {photoPreview ? (
-                                        <div className="space-y-4">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src={photoPreview} alt="Preview" className="w-32 h-32 rounded-full mx-auto object-cover border-4 border-emerald-500 shadow-xl" />
-                                            <span className="text-emerald-600 font-bold text-sm block">Change Photo</span>
+                            <div className="bg-gray-50 rounded-2xl p-6 border-2 border-dashed border-gray-200 text-center relative border-emerald-100 transition-colors">
+
+                                {isCameraOpen ? (
+                                    <div className="space-y-4 animate-in fade-in duration-300">
+                                        <div className="relative w-full max-w-sm mx-auto overflow-hidden rounded-2xl border-4 border-emerald-500 shadow-xl bg-black">
+                                            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                                            <video ref={videoRef} className="w-full h-auto aspect-square object-cover transform scale-x-[-1]" autoPlay playsInline disablePictureInPicture />
+                                            <canvas ref={canvasRef} className="hidden" />
                                         </div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
-                                                <Camera size={32} />
-                                            </div>
-                                            <div>
-                                                <h4 className="font-bold text-gray-800">Profile Photo</h4>
-                                                <p className="text-sm text-gray-500 mt-1">Take a selfie or upload a headshot</p>
-                                            </div>
+                                        <div className="flex justify-center space-x-4">
+                                            <button type="button" onClick={stopCamera} className="px-4 py-2 bg-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-300 transition-colors">
+                                                Cancel
+                                            </button>
+                                            <button type="button" onClick={capturePhoto} className="flex items-center space-x-2 px-6 py-2 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/30">
+                                                <Aperture size={20} />
+                                                <span>Snap Photo</span>
+                                            </button>
                                         </div>
-                                    )}
-                                    <input type="file" accept="image/*" capture="user" className="hidden" onChange={handlePhotoChange} required />
-                                </label>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-6">
+                                        {photoPreview ? (
+                                            <div className="space-y-4">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img src={photoPreview} alt="Preview" className="w-32 h-32 rounded-full mx-auto object-cover border-4 border-emerald-500 shadow-xl" />
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-md shadow-emerald-500/20">
+                                                    <Camera size={32} />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-bold text-gray-800">Profile Photo</h4>
+                                                    <p className="text-sm text-gray-500 mt-1">Required for digital membership card</p>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="flex justify-center space-x-4">
+                                            <button
+                                                type="button"
+                                                onClick={startCamera}
+                                                className="px-4 py-2 bg-emerald-100 text-emerald-700 font-bold rounded-xl hover:bg-emerald-200 transition-colors"
+                                            >
+                                                {photoPreview ? 'Retake Photo' : 'Open Camera'}
+                                            </button>
+
+                                            <label className="cursor-pointer px-4 py-2 border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-100 transition-colors">
+                                                <span>Upload File</span>
+                                                <input type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+                                            </label>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Certificate Upload */}
