@@ -72,7 +72,12 @@ export async function POST(req: Request) {
             });
         }
 
-        // 2. Create Stripe Customer if one doesn't exist
+        // 2. If they checked the Guest box, skip Stripe completely and return to dashboard
+        if (isGuest || !plan) {
+            return NextResponse.json({ url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/dashboard?success=true&guest=true` }, { status: 200 });
+        }
+
+        // 3. Member path: Create Stripe Customer if one doesn't exist
         let customerId = user.stripeCustomerId;
         if (!customerId) {
             const customer = await stripe.customers.create({
@@ -90,12 +95,7 @@ export async function POST(req: Request) {
             });
         }
 
-        // 3. Optional: Create Stripe Checkout Session
-        // If they checked the Guest box, skip Stripe and return them to the dashboard
-        if (isGuest || !plan) {
-            return NextResponse.json({ url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/dashboard?success=true&guest=true` }, { status: 200 });
-        }
-
+        // 4. Create Stripe Checkout Session
         const unitAmount = billingCycle === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
 
         if (unitAmount > 0) {
