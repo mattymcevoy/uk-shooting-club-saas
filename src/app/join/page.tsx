@@ -30,9 +30,15 @@ export default function JoinUs() {
             try {
                 const res = await fetch('/api/admin/settings/pricing');
                 const data = await res.json();
-                setPlans(data);
-                if (data.length > 0) {
-                    setFormData(prev => ({ ...prev, membershipTier: data[0].id }));
+
+                if (Array.isArray(data)) {
+                    setPlans(data);
+                    if (data.length > 0) {
+                        setFormData(prev => ({ ...prev, membershipTier: data[0].id }));
+                    }
+                } else {
+                    console.error("API did not return an array:", data);
+                    setPlans([]);
                 }
             } catch (err) {
                 console.error("Failed to load plans", err);
@@ -335,8 +341,8 @@ export default function JoinUs() {
                                             type="button"
                                             onClick={() => setFormData({ ...formData, membershipTier: plan.id })}
                                             className={`w-full text-left p-6 rounded-2xl border-2 transition-all ${formData.membershipTier === plan.id
-                                                    ? 'border-emerald-500 bg-emerald-50'
-                                                    : 'border-gray-100 hover:border-gray-200 bg-white'
+                                                ? 'border-emerald-500 bg-emerald-50'
+                                                : 'border-gray-100 hover:border-gray-200 bg-white'
                                                 }`}
                                         >
                                             <div className="flex justify-between items-start">

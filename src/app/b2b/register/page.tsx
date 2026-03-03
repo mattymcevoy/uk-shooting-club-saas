@@ -26,9 +26,15 @@ export default function B2BRegisterPage() {
             try {
                 const res = await fetch('/api/admin/super/pricing');
                 const data = await res.json();
-                setPlans(data);
-                if (data.length > 0) {
-                    setFormData(prev => ({ ...prev, platformPlanId: data[0].id }));
+
+                if (Array.isArray(data)) {
+                    setPlans(data);
+                    if (data.length > 0) {
+                        setFormData(prev => ({ ...prev, platformPlanId: data[0].id }));
+                    }
+                } else {
+                    console.error("API did not return an array:", data);
+                    setPlans([]);
                 }
             } catch (err) {
                 console.error("Failed to load SaaS plans", err);

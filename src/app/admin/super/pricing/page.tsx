@@ -23,7 +23,12 @@ export default function SuperAdminPricingPage() {
         try {
             const res = await fetch('/api/admin/super/pricing');
             const data = await res.json();
-            setPlans(data);
+            if (Array.isArray(data)) {
+                setPlans(data);
+            } else {
+                console.error("API did not return an array:", data);
+                setPlans([]);
+            }
         } catch (error) {
             console.error('Failed to load platform plans', error);
         } finally {
