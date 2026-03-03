@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import QRCode from 'react-qr-code';
 
 type Facility = {
     id: string;
@@ -18,6 +19,7 @@ export default function MemberBookingsPortal() {
 
     const [loading, setLoading] = useState(true);
     const [bookingStatus, setBookingStatus] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+    const [bookingData, setBookingData] = useState<{ id: string; qrHash: string } | null>(null);
 
     useEffect(() => {
         fetchFacilities();
@@ -65,6 +67,12 @@ export default function MemberBookingsPortal() {
 
             if (res.ok) {
                 const data = await res.json();
+
+                // Store the booking data to render the QR Code
+                if (data.booking) {
+                    setBookingData(data.booking);
+                }
+
                 if (data.clientSecret) {
                     setBookingStatus({ type: 'success', message: 'Proceeding to payment gateway...' });
                     setTimeout(() => {
@@ -105,8 +113,8 @@ export default function MemberBookingsPortal() {
                                     key={fac.id}
                                     onClick={() => setSelectedFacility(fac.id)}
                                     className={`text-left p-5 rounded-2xl border-2 transition-all duration-300 ${selectedFacility === fac.id
-                                            ? 'border-emerald-500 bg-emerald-50 shadow-emerald-500/20 shadow-lg scale-[1.02]'
-                                            : 'border-transparent bg-gray-50 hover:bg-gray-100'
+                                        ? 'border-emerald-500 bg-emerald-50 shadow-emerald-500/20 shadow-lg scale-[1.02]'
+                                        : 'border-transparent bg-gray-50 hover:bg-gray-100'
                                         }`}
                                 >
                                     <h3 className={`font-bold text-lg ${selectedFacility === fac.id ? 'text-emerald-900' : 'text-gray-900'}`}>{fac.name}</h3>
@@ -144,9 +152,33 @@ export default function MemberBookingsPortal() {
                     </div>
 
                     {bookingStatus && (
-                        <div className={`p-4 rounded-xl text-sm font-bold animate-in fade-in zoom-in duration-300 ${bookingStatus.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'
+                        <div className={`p-8 rounded-2xl animate-in fade-in zoom-in duration-300 flex flex-col items-center justify-center space-y-4 ${bookingStatus.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-white border border-emerald-200 shadow-xl'
                             }`}>
-                            {bookingStatus.message}
+                            <div className="text-center font-bold text-lg">
+                                {bookingStatus.message}
+                            </div>
+
+                            {bookingStatus.type === 'success' && bookingData && (
+                                <div className="mt-6 flex flex-col items-center p-6 bg-gray-50 rounded-xl border border-gray-100 w-full">
+                                    <h4 className="text-emerald-700 font-bold mb-4 uppercase tracking-widest text-sm">Your Entrance Pass</h4>
+                                    <div className="bg-white p-4 rounded-xl shadow-sm inline-block">
+                                        <QRCode
+                                            value={JSON.stringify({
+                                                bookingId: bookingData.id,
+                                                qrHash: bookingData.qrHash,
+                                                type: 'BOOKING_VERIFICATION'
+                                            })}
+                                            size={200}
+                                            bgColor="#ffffff"
+                                            fgColor="#000000"
+                                            level="H"
+                                        />
+                                    </div>
+                                    <p className="text-gray-500 text-sm mt-4 text-center max-w-sm">
+                                        Screenshot this code. You will need to present it to the Range Officer upon arrival.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     )}
 

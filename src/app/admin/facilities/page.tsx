@@ -22,6 +22,8 @@ export default function FacilitiesAdmin() {
     const [capacity, setCapacity] = useState(1);
     const [baseRate, setBaseRate] = useState(0); // in pence
     const [memberRate, setMemberRate] = useState(0); // in pence
+    const [isActive, setIsActive] = useState(true);
+    const [editingId, setEditingId] = useState<string | null>(null);
 
     useEffect(() => {
         fetchFacilities();
@@ -42,28 +44,45 @@ export default function FacilitiesAdmin() {
         }
     };
 
+    const handleEditClick = (fac: Facility) => {
+        setEditingId(fac.id);
+        setName(fac.name);
+        setDescription(fac.description || '');
+        setCapacity(fac.capacity);
+        setBaseRate(fac.baseRate / 100);
+        setMemberRate(fac.memberRate / 100);
+        setIsActive(fac.isActive);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await fetch('/api/facilities', {
-                method: 'POST',
+            const endpoint = '/api/facilities';
+            const method = editingId ? 'PUT' : 'POST';
+
+            const res = await fetch(endpoint, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    id: editingId,
                     name,
                     description,
                     capacity: Number(capacity),
                     baseRate: Number(baseRate) * 100, // convert pounds to pence
                     memberRate: Number(memberRate) * 100, // convert pounds to pence
-                    isActive: true,
+                    isActive,
                 }),
             });
 
             if (res.ok) {
+                setEditingId(null);
                 setName('');
                 setDescription('');
                 setCapacity(1);
                 setBaseRate(0);
                 setMemberRate(0);
+                setIsActive(true);
                 fetchFacilities();
             }
         } catch (error) {
@@ -78,7 +97,27 @@ export default function FacilitiesAdmin() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Col: Create Form */}
                 <div className="lg:col-span-1 bg-white/70 backdrop-blur-lg rounded-3xl p-8 shadow-sm border border-gray-100 h-fit">
-                    <h2 className="text-xl font-bold text-gray-800 mb-6">Create Facility</h2>
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-xl font-bold text-gray-800">
+                            {editingId ? 'Edit Facility' : 'Create Facility'}
+                        </h2>
+                        {editingId && (
+                            <button
+                                onClick={() => {
+                                    setEditingId(null);
+                                    setName('');
+                                    setDescription('');
+                                    setCapacity(1);
+                                    setBaseRate(0);
+                                    setMemberRate(0);
+                                    setIsActive(true);
+                                }}
+                                className="text-sm text-gray-500 hover:text-gray-700"
+                            >
+                                Cancel Edit
+                            </button>
+                        )}
+                    </div>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
@@ -138,11 +177,24 @@ export default function FacilitiesAdmin() {
                                 />
                             </div>
                         </div>
+                        {editingId && (
+                            <div>
+                                <label className="flex items-center space-x-2 mt-4 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={isActive}
+                                        onChange={(e) => setIsActive(e.target.checked)}
+                                        className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                                    />
+                                    <span className="text-sm font-medium text-gray-700">Facility is Active</span>
+                                </label>
+                            </div>
+                        )}
                         <button
                             type="submit"
                             className="w-full mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-emerald-600/30 transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"
                         >
-                            Add Facility
+                            {editingId ? 'Update Facility' : 'Add Facility'}
                         </button>
                     </form>
                 </div>
@@ -168,9 +220,17 @@ export default function FacilitiesAdmin() {
                                             <h3 className="text-lg font-bold text-gray-900 group-hover:text-emerald-700 transition-colors">{fac.name}</h3>
                                             <p className="text-sm text-gray-500 mt-1">{fac.description || 'No description'}</p>
                                         </div>
-                                        <span className={`px-2 py-1 text-xs font-bold rounded-md ${fac.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                            {fac.isActive ? 'Active' : 'Inactive'}
-                                        </span>
+                                        <div className="flex flex-col items-end space-y-2">
+                                            <span className={`px-2 py-1 text-xs font-bold rounded-md ${fac.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                {fac.isActive ? 'Active' : 'Inactive'}
+                                            </span>
+                                            <button
+                                                onClick={() => handleEditClick(fac)}
+                                                className="text-emerald-600 hover:text-emerald-800 text-sm font-medium"
+                                            >
+                                                Edit
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div className="space-y-2 text-sm mt-4 pt-4 border-t border-gray-100">

@@ -7,6 +7,32 @@ datasource db {
 }
 
 // ==========================================
+// Multi-Tenant Architecture
+// ==========================================
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  logoUrl     String?
+  themeColor  String?  @default("#10b981") // emerald-500
+  
+  // B2B Stripe SaaS Subscription
+  stripeCustomerId       String? @unique
+  stripeSubscriptionId   String? @unique
+  subscriptionStatus     SubscriptionStatus @default(TRIALING)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  users       User[]
+  facilities  Facility[]
+  events      Event[]
+  bookings    Booking[]
+  invoices    Invoice[]
+  subscriptions Subscription[]
+}
+
+// ==========================================
 // Base & Membership Models
 // ==========================================
 
@@ -26,8 +52,17 @@ enum AccountStatus {
 
 model User {
   id        String   @id @default(cuid())
+  
+  // Tenant Isolation
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // A User is unique per email *per organization*
+  // This allows a shooter to be a member of two different clubs with the same email
+  email     String
+  @@unique([email, organizationId])
+
   name      String
-  email     String   @unique
   phone     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -35,7 +70,21 @@ model User {
   // Membership & Financials
   membershipTier   MembershipTier @default(GUEST)
   status           AccountStatus  @default(ACTIVE)
-  stripeCustomerId String?        @unique
+  stripeCustomerId String?        
+
+  // New Membership Properties
+  isLicenseHolder      Boolean @default(false)
+  isRegisteredShooter  Boolean @default(false)
+  address              String?
+  certificateNumber    String?
+  
+  // File Upload References (Vercel Blob URLs)
+  profilePhotoUrl      String?
+  certificateUrl       String?
+  gunLicenseUrl        String?
+
+  // Security Hash for Membership QR
+  qrHash               String? @unique
 
   // Relations
   subscriptions Subscription[]
@@ -56,8 +105,11 @@ enum SubscriptionStatus {
 
 model Subscription {
   id     String @id @default(cuid())
-  userId String @unique
+  userId String 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   stripeSubscriptionId String             @unique
   status               SubscriptionStatus @default(ACTIVE)
@@ -67,6 +119,8 @@ model Subscription {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  @@unique([userId, organizationId])
 }
 
 enum InvoiceStatus {
@@ -80,6 +134,9 @@ model Invoice {
   id     String @id @default(cuid())
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   stripeInvoiceId String?       @unique
   amount          Int // Stored in smallest currency unit (e.g., pence)
@@ -96,6 +153,10 @@ model Invoice {
 
 model Facility {
   id          String  @id @default(cuid())
+  
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   name        String
   description String?
   capacity    Int     @default(1) // Number of lanes, pegs, or total slots
@@ -123,6 +184,9 @@ model Booking {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   facilityId String
   facility   Facility @relation(fields: [facilityId], references: [id])
 
@@ -132,9 +196,31 @@ model Booking {
 
   paymentIntentId String? // Stripe PaymentIntent for standalone bookings
   amountPaid      Int     @default(0)
+  
+  // Event specific QR hash
+  qrHash          String? @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([facilityId, startTime, endTime])
+}
+
+// ==========================================
+// Event & CRM Models
+// ==========================================
+
+model Event {
+  id          String   @id @default(cuid())
+  
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  date        DateTime
+  maxAttendees Int?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

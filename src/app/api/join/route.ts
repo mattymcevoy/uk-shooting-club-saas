@@ -20,12 +20,10 @@ export async function POST(req: Request) {
         const organizationId = await getCurrentOrganizationId();
 
         // 1. Check if user already exists
-        let user = await prisma.user.findUnique({
+        let user = await prisma.user.findFirst({
             where: {
-                email_organizationId: {
-                    email,
-                    organizationId
-                }
+                email,
+                organizationId
             }
         });
 
@@ -71,7 +69,8 @@ export async function POST(req: Request) {
                 email: user.email,
                 name: user.name,
                 metadata: {
-                    userId: user.id
+                    userId: user.id,
+                    organizationId
                 }
             });
             customerId = customer.id;
@@ -113,7 +112,8 @@ export async function POST(req: Request) {
                 cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/join?canceled=true`,
                 metadata: {
                     userId: user.id,
-                    tier: membershipTier
+                    tier: membershipTier,
+                    organizationId
                 }
             });
 

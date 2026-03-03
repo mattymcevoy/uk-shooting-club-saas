@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# UK Shooting Club SaaS
 
-## Getting Started
+A comprehensive, vibrant, and fully responsive management platform for UK shooting clubs. This Next.js application manages memberships, handles subscriptions via Stripe, and coordinates facility capacities and digital bookings.
 
-First, run the development server:
+## Features Built
+- **Membership & Financials**: Recurring Stripe billing subscriptions, member tracking, invoice history, and an overarching Admin revenue dashboard.
+- **Facility Bookings**: Self-service member booking portal mapped to dynamic facility capacities, member pricing rates, and time-slot scheduling.
+- **Premium Design**: Vanilla CSS utilizing deep emerald gradients, modern glassmorphism, and responsive interactivity.
 
+## Deployment Instructions
+
+### 1. Database Configuration
+You will need a PostgreSQL database (e.g., Supabase, Vercel Postgres, Render, or local).
+Ensure your deployment environment has the following variable set:
+- `DATABASE_URL`: Connection string to your PostgreSQL instance.
+
+### 2. Stripe Configuration
+You must create a Stripe account and configure the following:
+- **Products & Prices**: Set up your recurring membership tiers in Stripe.
+- **Webhook Endpoint**: Register your deployment's webhook URL (e.g. `https://your-domain.com/api/webhooks/stripe`) in the Stripe Dashboard.
+Set the resulting API keys in your environment variables:
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`: From Stripe API Keys.
+- `STRIPE_SECRET_KEY`: From Stripe API Keys.
+- `STRIPE_WEBHOOK_SECRET`: From the Webhook endpoint configuration.
+
+### 3. Vercel Deployment
+This project is configured for Vercel. 
+1. Connect this Git repository to Vercel.
+2. In the Vercel project settings, supply the environment variables listed above.
+3. The `postinstall: prisma generate` hook is already configured in `package.json` to handle ORM generation during the Vercel Build Step.
+
+### Local Development
+To run the server locally:
 ```bash
+# Provide dummy environment variables for setup testing
+touch .env.local
+
+# Run Prisma DB Push to align the database
+npx prisma db push
+
+# Run the dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
