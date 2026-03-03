@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Target, Users, CreditCard, Calendar, Settings, QrCode } from 'lucide-react';
+import { Target, Users, CreditCard, Calendar, Settings, QrCode, UserPlus } from 'lucide-react';
 
 export default function AdminDashboardPage() {
 
@@ -11,6 +11,14 @@ export default function AdminDashboardPage() {
             icon: Users,
             color: 'bg-blue-500/20 text-blue-400 border-blue-500/30 hover:border-blue-500',
             bgGlow: 'group-hover:bg-blue-500/10'
+        },
+        {
+            title: 'Onboard Customer',
+            description: 'Directly open the membership registration portal to sign up a new shooter or guest.',
+            href: '/join',
+            icon: UserPlus,
+            color: 'bg-teal-500/20 text-teal-400 border-teal-500/30 hover:border-teal-500',
+            bgGlow: 'group-hover:bg-teal-500/10'
         },
         {
             title: 'Facility & Pricing',
