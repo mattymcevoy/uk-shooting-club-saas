@@ -11,6 +11,9 @@ export default function JoinUs() {
     const [loading, setLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+    // Guest vs Member Mode
+    const [isGuest, setIsGuest] = useState(true);
+
     // Form State
     const [formData, setFormData] = useState({
         name: '',
@@ -156,6 +159,7 @@ export default function JoinUs() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ...formData,
+                    isGuest,
                     profilePhotoUrl: photoUploadUrl,
                     certificateUrl: certUploadUrl
                 })
@@ -168,7 +172,7 @@ export default function JoinUs() {
             }
 
             if (data.url) {
-                // Redirect to Stripe Checkout
+                // Redirect to Stripe Checkout or Dashboard
                 window.location.href = data.url;
             } else {
                 router.push('/dashboard');
@@ -188,7 +192,7 @@ export default function JoinUs() {
                         Join the UK Shooting Club
                     </h2>
                     <p className="text-gray-500 text-sm font-medium">Step {step} of 3 • {
-                        step === 1 ? 'Personal Details' : step === 2 ? 'Documents & Photos' : 'Select Membership'
+                        step === 1 ? 'Personal Details' : step === 2 ? 'Documents & Photos' : 'Membership Status'
                     }</p>
                 </div>
 
@@ -312,55 +316,79 @@ export default function JoinUs() {
                     {/* STEP 3: Membership Selection */}
                     {step === 3 && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-                            <div className="grid grid-cols-2 gap-4 bg-gray-100 p-1.5 rounded-2xl">
-                                <button
-                                    type="button"
-                                    onClick={() => setFormData({ ...formData, billingCycle: 'monthly' })}
-                                    className={`py-3 text-sm font-bold rounded-xl transition-all ${formData.billingCycle === 'monthly' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
-                                >
-                                    Monthly
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setFormData({ ...formData, billingCycle: 'annual' })}
-                                    className={`py-3 text-sm font-bold rounded-xl transition-all ${formData.billingCycle === 'annual' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
-                                >
-                                    Annual <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full ml-1 uppercase">Save 20%</span>
-                                </button>
+
+                            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6">
+                                <label className="flex items-start space-x-4 cursor-pointer">
+                                    <div className="flex items-center h-6">
+                                        <input
+                                            type="checkbox"
+                                            checked={!isGuest}
+                                            onChange={(e) => setIsGuest(!e.target.checked)}
+                                            className="w-5 h-5 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                                        />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="text-lg font-bold text-gray-900">I want to become a full member</h4>
+                                        <p className="text-sm text-gray-600 mt-1">
+                                            If unchecked, you will be registered as a Guest. A free digital QR profile will be created for you to comply with Estate rules, allowing staff to scan you in when you arrive.
+                                        </p>
+                                    </div>
+                                </label>
                             </div>
 
-                            <div className="space-y-4">
-                                {plans.length === 0 ? (
-                                    <div className="p-8 text-center bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl">
-                                        No membership plans are currently available. Please contact the club.
-                                    </div>
-                                ) : (
-                                    plans.map(plan => (
+                            {!isGuest && (
+                                <div className="space-y-6 animate-in fade-in duration-500">
+                                    <div className="grid grid-cols-2 gap-4 bg-gray-100 p-1.5 rounded-2xl">
                                         <button
-                                            key={plan.id}
                                             type="button"
-                                            onClick={() => setFormData({ ...formData, membershipTier: plan.id })}
-                                            className={`w-full text-left p-6 rounded-2xl border-2 transition-all ${formData.membershipTier === plan.id
-                                                ? 'border-emerald-500 bg-emerald-50'
-                                                : 'border-gray-100 hover:border-gray-200 bg-white'
-                                                }`}
+                                            onClick={() => setFormData({ ...formData, billingCycle: 'monthly' })}
+                                            className={`py-3 text-sm font-bold rounded-xl transition-all ${formData.billingCycle === 'monthly' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
                                         >
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <h3 className={`font-bold text-lg ${formData.membershipTier === plan.id ? 'text-emerald-900' : 'text-gray-900'}`}>{plan.name}</h3>
-                                                    <p className="text-sm text-gray-500 mt-1">{plan.description}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className={`font-extrabold text-xl ${formData.membershipTier === plan.id ? 'text-emerald-600' : 'text-gray-900'}`}>
-                                                        £{((formData.billingCycle === 'monthly' ? plan.monthlyPrice : plan.annualPrice) / 100).toFixed(2)}
-                                                    </div>
-                                                    <div className="text-xs text-gray-400">/{formData.billingCycle === 'monthly' ? 'mo' : 'yr'}</div>
-                                                </div>
-                                            </div>
+                                            Monthly
                                         </button>
-                                    ))
-                                )}
-                            </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, billingCycle: 'annual' })}
+                                            className={`py-3 text-sm font-bold rounded-xl transition-all ${formData.billingCycle === 'annual' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+                                        >
+                                            Annual <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full ml-1 uppercase">Save 20%</span>
+                                        </button>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        {plans.length === 0 ? (
+                                            <div className="p-8 text-center bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl">
+                                                No membership plans are currently available. Please contact the club.
+                                            </div>
+                                        ) : (
+                                            plans.map(plan => (
+                                                <button
+                                                    key={plan.id}
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, membershipTier: plan.id })}
+                                                    className={`w-full text-left p-6 rounded-2xl border-2 transition-all ${formData.membershipTier === plan.id
+                                                        ? 'border-emerald-500 bg-emerald-50'
+                                                        : 'border-gray-100 hover:border-gray-200 bg-white'
+                                                        }`}
+                                                >
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <h3 className={`font-bold text-lg ${formData.membershipTier === plan.id ? 'text-emerald-900' : 'text-gray-900'}`}>{plan.name}</h3>
+                                                            <p className="text-sm text-gray-500 mt-1">{plan.description}</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className={`font-extrabold text-xl ${formData.membershipTier === plan.id ? 'text-emerald-600' : 'text-gray-900'}`}>
+                                                                £{((formData.billingCycle === 'monthly' ? plan.monthlyPrice : plan.annualPrice) / 100).toFixed(2)}
+                                                            </div>
+                                                            <div className="text-xs text-gray-400">/{formData.billingCycle === 'monthly' ? 'mo' : 'yr'}</div>
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -382,6 +410,11 @@ export default function JoinUs() {
                             <button disabled={loading} type="submit" className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-emerald-500/30 transition-all flex items-center space-x-2">
                                 {loading ? (
                                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                ) : isGuest ? (
+                                    <>
+                                        <span>Register as Guest</span>
+                                        <CheckCircle size={18} />
+                                    </>
                                 ) : (
                                     <>
                                         <span>Proceed to Payment</span>

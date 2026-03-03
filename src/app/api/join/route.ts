@@ -9,7 +9,7 @@ export async function POST(req: Request) {
         const body = await req.json();
         const {
             name, email, phone, address, certificateNumber,
-            membershipTier, billingCycle,
+            membershipTier: planId, billingCycle, isGuest,
             profilePhotoUrl, certificateUrl
         } = body;
 
@@ -18,6 +18,17 @@ export async function POST(req: Request) {
         }
 
         const organizationId = await getCurrentOrganizationId();
+
+        // 0. Resolve Dynamic Memberships if not a Guest
+        let plan = null;
+        if (!isGuest && planId) {
+            plan = await prisma.membershipPlan.findUnique({
+                where: { id: planId }
+            });
+            if (!plan) {
+                return NextResponse.json({ error: 'Selected membership tier is invalid' }, { status: 400 });
+            }
+        }
 
         // 1. Check if user already exists
         let user = await prisma.user.findFirst({
@@ -38,11 +49,11 @@ export async function POST(req: Request) {
                     phone,
                     address,
                     certificateNumber,
-                    membershipTier,
+                    membershipTier: 'GUEST', // Always start as GUEST until Stripe returns success
                     profilePhotoUrl,
                     certificateUrl,
                     qrHash,
-                    status: 'ACTIVE', // By default pending payment, but simplify for demo
+                    status: 'ACTIVE',
                     organizationId
                 }
             });
@@ -55,7 +66,6 @@ export async function POST(req: Request) {
                     phone,
                     address,
                     certificateNumber,
-                    membershipTier,
                     profilePhotoUrl: profilePhotoUrl || user.profilePhotoUrl,
                     certificateUrl: certificateUrl || user.certificateUrl,
                 }
@@ -81,12 +91,12 @@ export async function POST(req: Request) {
         }
 
         // 3. Optional: Create Stripe Checkout Session
-        let unitAmount = 0;
-        if (membershipTier === 'FULL_MEMBER') {
-            unitAmount = billingCycle === 'monthly' ? 4500 : 45000;
-        } else if (membershipTier === 'VIP') {
-            unitAmount = billingCycle === 'monthly' ? 10000 : 100000;
+        // If they checked the Guest box, skip Stripe and return them to the dashboard
+        if (isGuest || !plan) {
+            return NextResponse.json({ url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/dashboard?success=true&guest=true` }, { status: 200 });
         }
+
+        const unitAmount = billingCycle === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
 
         if (unitAmount > 0) {
             const session = await stripe.checkout.sessions.create({
@@ -98,7 +108,7 @@ export async function POST(req: Request) {
                         price_data: {
                             currency: 'gbp',
                             product_data: {
-                                name: `${membershipTier.replace('_', ' ')} - ${billingCycle.toUpperCase()}`,
+                                name: `${plan.name} - ${billingCycle.toUpperCase()}`,
                             },
                             unit_amount: unitAmount,
                             recurring: {
@@ -112,7 +122,8 @@ export async function POST(req: Request) {
                 cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/join?canceled=true`,
                 metadata: {
                     userId: user.id,
-                    tier: membershipTier,
+                    tierId: plan.id,
+                    tierName: plan.name,
                     organizationId
                 }
             });
