@@ -1,82 +1,87 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import { AccountStatus } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { type, qrHash, bookingId, userId } = body;
+        // Fallback to checking the `qrHash` against the User if the payload is raw text
+        // Or unpack the JSON payload from the dashboard
+        let qrHashToSearch = '';
 
-        if (!type || !qrHash) {
-            return NextResponse.json({ error: 'Invalid QR Payload format' }, { status: 400 });
+        try {
+            const parsed = JSON.parse(body.qrHash || '{}');
+            qrHashToSearch = parsed.qrHash || body.qrHash;
+        } catch {
+            qrHashToSearch = body.qrHash;
         }
 
-        // 1. Memberships Verification
-        if (type === 'MEMBERSHIP_VERIFICATION' && userId) {
-            const user = await prisma.user.findUnique({
-                where: { id: userId, qrHash }
-            });
-
-            if (!user) {
-                return NextResponse.json({ error: 'Membership Verification Failed' }, { status: 404 });
-            }
-
-            // Return strictly what the scanner app needs
-            return NextResponse.json({
-                record: {
-                    name: user.name,
-                    email: user.email,
-                    phone: user.phone,
-                    status: user.status as AccountStatus,
-                    membershipTier: user.membershipTier,
-                    isLicenseHolder: user.isLicenseHolder,
-                    isRegisteredShooter: user.isRegisteredShooter,
-                    profilePhotoUrl: user.profilePhotoUrl
-                }
-            }, { status: 200 });
+        if (!qrHashToSearch) {
+            return NextResponse.json({ error: 'QR Hash is required' }, { status: 400 });
         }
 
-        // 2. Booking Verification
-        if (type === 'BOOKING_VERIFICATION' && bookingId) {
-            const booking = await prisma.booking.findUnique({
-                where: { id: bookingId, qrHash },
-                include: {
-                    user: { select: { name: true, phone: true, isLicenseHolder: true } },
-                    facility: { select: { name: true, isActive: true } }
-                }
-            });
+        // 1. Find the User by their permanent `qrHash`
+        const user = await prisma.user.findUnique({
+            where: { qrHash: qrHashToSearch },
+        });
 
-            if (!booking) {
-                return NextResponse.json({ error: 'Booking Verification Failed' }, { status: 404 });
-            }
-
-            // Optional Check: Is the booking for today?
-            const now = new Date();
-            const bookingDate = new Date(booking.startTime);
-            const isToday = bookingDate.setHours(0, 0, 0, 0) === new Date(now).setHours(0, 0, 0, 0);
-
-            if (!isToday) {
-                return NextResponse.json({ error: `Warning: Booking is scheduled for ${new Date(booking.startTime).toLocaleDateString()}` }, { status: 400 });
-            }
-
-            return NextResponse.json({
-                record: {
-                    id: booking.id,
-                    status: booking.status,
-                    startTime: booking.startTime,
-                    endTime: booking.endTime,
-                    user: booking.user,
-                    facility: booking.facility
-                }
-            }, { status: 200 });
+        if (!user) {
+            return NextResponse.json({ error: 'Invalid QR Code. No member found.' }, { status: 404 });
         }
 
-        return NextResponse.json({ error: 'Unknown QR Type' }, { status: 400 });
+        // 2. Define the 48-hour window (+/- 24 hours around now)
+        const now = new Date();
+        const twoDaysAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+        const twoDaysFromNow = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+
+        // 3. Find active bookings for this user within the time window
+        const recentBookings = await prisma.booking.findMany({
+            where: {
+                userId: user.id,
+                startTime: {
+                    gte: twoDaysAgo,
+                    lte: twoDaysFromNow,
+                }
+            },
+            include: {
+                facility: { select: { name: true } },
+                event: { select: { title: true } },
+                squad: { select: { name: true } }
+            },
+            orderBy: {
+                startTime: 'asc'
+            }
+        });
+
+        return NextResponse.json({
+            success: true,
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                membershipTier: user.membershipTier,
+                isLicenseHolder: user.isLicenseHolder,
+                profilePhotoUrl: user.profilePhotoUrl,
+                status: user.status,
+                creditBalance: user.creditBalance,
+            },
+            itinerary: recentBookings.map(b => ({
+                id: b.id,
+                facilityName: b.facility?.name || 'General Facility',
+                eventName: b.event?.title,
+                startTime: b.startTime,
+                endTime: b.endTime,
+                status: b.status,
+                squadNumber: b.squad?.name || null,
+                prePaidClays: b.prePaidClays,
+                prePaidLessons: b.prePaidLessons,
+                checkedInAt: b.checkedInAt,
+            }))
+        });
 
     } catch (error) {
-        console.error('QR Verification Error:', error);
+        console.error('Verify QR API Error:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

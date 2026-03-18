@@ -55,15 +55,20 @@ model User {
   id        String   @id @default(cuid())
   
   // Tenant Isolation
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?   // Added for CredentialsProvider fallback
+  
+  // Custom Registration Properties
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  // A User is unique per email *per organization*
-  // This allows a shooter to be a member of two different clubs with the same email
-  email     String
-  @@unique([email, organizationId])
-
-  name      String
+  // A User is unique per email *per organization* in our custom logic, 
+  // but NextAuth standardly keys off the unique `email` field above for simplicity.
+  // We remove the composite unique constraint to satisfy NextAuth's default adapter behavior.
+  
+  name      String?
   phone     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -84,18 +89,87 @@ model User {
   certificateUrl       String?
   gunLicenseUrl        String?
 
+  // Document Access Control
+  licenseAccessGranted   Boolean @default(false)
+  licenseAccessRequested Boolean @default(false)
+
   // Security Hash for Membership QR
   qrHash               String? @unique
 
+  // E-Wallet (Digital Clays)
+  creditBalance        Int @default(0) // Balance in 'Digital Clays' or pennies
+
   // Relations
+  accounts      Account[]
+  sessions      Session[]
   subscriptions Subscription[]
   invoices      Invoice[]
   bookings      Booking[]
+  walletTx      WalletTransaction[]
 }
 
 // ==========================================
-// Financial & Billing Models
+// NextAuth Models (Auth.js)
 // ==========================================
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ==========================================
+// Financial & E-Wallet Models
+// ==========================================
+
+enum TransactionType {
+  DEPOSIT
+  USAGE
+  REFUND
+}
+
+model WalletTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type        TransactionType
+  amount      Int      // Positives for deposits/refunds, negatives for usage
+  description String?  // e.g., "Reloaded 100 Clays", "Shot 50 Clays at Range A"
+  
+  stripePaymentIntentId String? @unique
+
+  createdAt   DateTime @default(now())
+}
 
 enum SubscriptionStatus {
   ACTIVE
@@ -188,8 +262,11 @@ model Booking {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  facilityId String
-  facility   Facility @relation(fields: [facilityId], references: [id])
+  facilityId String?
+  facility   Facility? @relation(fields: [facilityId], references: [id])
+
+  eventId    String?
+  event      Event?    @relation(fields: [eventId], references: [id])
 
   startTime DateTime
   endTime   DateTime
@@ -198,6 +275,15 @@ model Booking {
   paymentIntentId String? // Stripe PaymentIntent for standalone bookings
   amountPaid      Int     @default(0)
   
+  // Event & Check-in Details
+  squadId         String?
+  squad           Squad?  @relation(fields: [squadId], references: [id])
+  attendeeName    String?
+  startStand      String?
+  prePaidClays    Int      @default(0)
+  prePaidLessons  Boolean  @default(false)
+  checkedInAt     DateTime?
+
   // Event specific QR hash
   qrHash          String? @unique
 
@@ -220,7 +306,31 @@ model Event {
   title       String
   description String?
   date        DateTime
+  
+  signInTime  DateTime?
+  startTime   DateTime?
   maxAttendees Int?
+  
+  eventType   String   @default("COMPETITION") // COMPETITION, CLAYMATE, CORPORATE_EVENT, RESTAURANT, SHOPPING_EVENT, OTHER
+  entryFee    Int      @default(0)             // Fee in pennies (E-Wallet credits)
+  
+  bookings    Booking[]
+  squads      Squad[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Squad {
+  id          String   @id @default(cuid())
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  name        String   // e.g. "Squad 1"
+  startTime   DateTime?
+  maxCapacity Int      @default(6)
+  
+  bookings    Booking[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

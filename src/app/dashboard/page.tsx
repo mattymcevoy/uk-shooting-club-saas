@@ -2,41 +2,156 @@
 
 import { useState, useEffect } from 'react';
 import QRCode from 'react-qr-code';
-import { User, Shield, CreditCard, Clock, MapPin, UploadCloud, CheckCircle } from 'lucide-react';
+import { User, Shield, KeyRound, Clock, MapPin, UploadCloud, CheckCircle, CreditCard } from 'lucide-react';
 import type { User as PrismaUser } from '@prisma/client';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 export default function MemberDashboard() {
-    const [user, setUser] = useState<PrismaUser | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { data: session, status } = useSession();
+    const router = useRouter();
 
-    // In a real app, this would use NextAuth or similar to get the logged-in ID
-    // We use a mock ID assigned in the Prisma schema for demonstration
-    const [mockUserId, setMockUserId] = useState<string | null>(null);
+    const [user, setUser] = useState<PrismaUser | any>(null);
+    const [loading, setLoading] = useState(true);
+    const [tempPassword, setTempPassword] = useState<string | null>(null);
+    const [isToppingUp, setIsToppingUp] = useState(false);
+
+    // New state for uploads
+    const [isUploading, setIsUploading] = useState<'certificate' | 'photo' | null>(null);
+    const [isDeleting, setIsDeleting] = useState<'certificate' | 'photo' | null>(null);
 
     useEffect(() => {
-        // 1. Fetch the first user to act as our logged in user for this demo
-        const fetchProfile = async () => {
-            try {
-                const memRes = await fetch('/api/admin/members');
-                const allMembers = await memRes.json();
+        if (status === 'unauthenticated') {
+            router.push('/auth/signin');
+            return;
+        }
 
-                if (allMembers && allMembers.length > 0) {
-                    const activeUser = allMembers[0];
-                    setUser(activeUser);
-                    setMockUserId(activeUser.id);
+        if (status === 'authenticated') {
+            const fetchProfile = async () => {
+                try {
+                    const res = await fetch('/api/user/me');
+                    if (res.ok) {
+                        const data = await res.json();
+                        setUser(data);
+                    } else {
+                        console.error('Failed to fetch user profile');
+                    }
+                } catch (error) {
+                    console.error('Error fetching profile:', error);
+                } finally {
+                    setLoading(false);
                 }
-            } catch (e) {
-                console.error('Failed to load profile', e);
-            } finally {
-                setLoading(false);
+            };
+
+            fetchProfile();
+        }
+
+        // Grab temp password if it exists from signup redirection
+        const tempPwd = sessionStorage.getItem('tempPassword');
+        if (tempPwd) {
+            setTempPassword(tempPwd);
+            sessionStorage.removeItem('tempPassword');
+        }
+    }, [status, router]);
+
+    const handleTopUp = async () => {
+        setIsToppingUp(true);
+        try {
+            const res = await fetch('/api/wallet/topup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount: 3500, description: "100 Clays Topup" }) // Hardcoded approx 100 clays for £35 as requested
+            });
+            const data = await res.json();
+
+            if (res.ok && data.url) {
+                window.location.href = data.url;
+            } else {
+                alert(`Top-up unavailable: ${data.error || 'Check Stripe API configuration'}`);
             }
-        };
-        fetchProfile();
-    }, []);
+        } catch (err) {
+            console.error("Failed to initiate top-up", err);
+        } finally {
+            setIsToppingUp(false);
+        }
+    };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, fileType: 'certificate' | 'photo') => {
-        // NOTE: This will be implemented in the next step when hooking up Vercel Blob
-        alert(`File selected for ${fileType}. Upload integration pending.`);
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploading(fileType);
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', fileType);
+        formData.append('action', 'upload');
+
+        try {
+            const res = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setUser(data.user);
+            } else {
+                const error = await res.json();
+                alert(`Upload failed: ${error.error}`);
+            }
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            alert('An error occurred during upload.');
+        } finally {
+            setIsUploading(null);
+            // reset file input
+            e.target.value = '';
+        }
+    };
+
+    const handleDeleteFile = async (fileType: 'certificate' | 'photo') => {
+        if (!confirm(`Are you sure you want to delete your ${fileType}?`)) return;
+
+        setIsDeleting(fileType);
+        const formData = new FormData();
+        formData.append('type', fileType);
+        formData.append('action', 'delete');
+
+        try {
+            const res = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setUser(data.user);
+            } else {
+                alert('Failed to delete file');
+            }
+        } catch (error) {
+            console.error('Error deleting file:', error);
+        } finally {
+            setIsDeleting(null);
+        }
+    };
+
+    const handleAccessToggle = async (grantAccess: boolean) => {
+        try {
+            const res = await fetch('/api/user/access', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ grantAccess }),
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setUser(data.user);
+            }
+        } catch (error) {
+            console.error('Error updating access:', error);
+        }
     };
 
     if (loading) {
@@ -64,6 +179,56 @@ export default function MemberDashboard() {
                 </h1>
                 <p className="text-gray-400 mt-2">Manage your club profile, physical documents, and active subscriptions.</p>
             </div>
+
+            {/* Access Request Banner Alert */}
+            {user.licenseAccessRequested && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between shadow-xl shadow-amber-900/10 mb-8">
+                    <div className="flex items-start space-x-4 mb-4 md:mb-0">
+                        <div className="p-3 bg-amber-500/20 rounded-xl text-amber-500">
+                            <Shield size={24} />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-white">Action Required: Compliance Check</h3>
+                            <p className="text-sm text-gray-300 mt-1 max-w-xl">
+                                An authorised admin has requested access to view your gun licence. Please click allow to permit access for compliance purposes.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex space-x-3">
+                        <button
+                            onClick={() => handleAccessToggle(false)}
+                            className="px-6 py-2 rounded-xl font-medium text-gray-400 bg-black/50 border border-white/10 hover:bg-white/5 transition-colors"
+                        >
+                            Deny
+                        </button>
+                        <button
+                            onClick={() => handleAccessToggle(true)}
+                            className="px-6 py-2 rounded-xl font-bold text-black bg-amber-500 hover:bg-amber-400 transition-colors shadow-lg shadow-amber-500/20"
+                        >
+                            Allow Access
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {tempPassword && (
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between shadow-xl shadow-emerald-900/10 mb-8">
+                    <div className="flex items-start space-x-4 mb-4 md:mb-0">
+                        <div className="p-3 bg-emerald-500/20 rounded-xl text-emerald-400">
+                            <KeyRound size={24} />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-white">Your Temporary Password</h3>
+                            <p className="text-sm text-gray-400 mt-1 max-w-xl">
+                                We've generated a secure temporary password for your new account. Please save it securely. You can use it to log in on your next visit.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="bg-black/50 border border-white/10 px-6 py-4 rounded-xl flex items-center space-x-6">
+                        <span className="text-2xl font-mono text-emerald-400 tracking-widest">{tempPassword}</span>
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Column: Digital ID Card */}
@@ -117,6 +282,43 @@ export default function MemberDashboard() {
                 {/* Right Column: Profile & Documents */}
                 <div className="lg:col-span-2 space-y-6">
 
+                    {/* E-Wallet Section */}
+                    <div className="bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border border-emerald-500/30 rounded-2xl p-6 relative overflow-hidden">
+                        <div className="absolute -right-10 -top-10 text-emerald-500/10 hidden md:block">
+                            <CreditCard size={180} />
+                        </div>
+                        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between">
+                            <div>
+                                <h3 className="text-xl font-bold text-white mb-1 flex items-center">
+                                    <CreditCard className="mr-3 text-emerald-400" /> E-Wallet Balance
+                                </h3>
+                                <p className="text-gray-400 text-sm">
+                                    Pre-load digital clays onto your account to spend seamlessly at the stands.
+                                </p>
+                            </div>
+                            <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end">
+                                <div className="text-3xl font-extrabold text-emerald-400 font-mono tracking-tight">
+                                    £{((user.creditBalance || 0) / 100).toFixed(2)}
+                                </div>
+                                <div className="text-xs text-emerald-500/70 font-bold uppercase tracking-widest mt-1">
+                                    ~ {Math.floor((user.creditBalance || 0) / 35)} Clays Available
+                                </div>
+                            </div>
+                        </div>
+                        <div className="relative z-10 mt-6 pt-6 border-t border-emerald-500/20 flex flex-wrap gap-4 items-center">
+                            <button
+                                onClick={handleTopUp}
+                                disabled={isToppingUp}
+                                className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 flex items-center"
+                            >
+                                {isToppingUp ? 'Processing...' : 'Load 100 Clays (£35)'}
+                            </button>
+                            <button className="px-6 py-2.5 bg-black/50 border border-white/10 hover:border-white/30 text-white font-medium rounded-xl transition-all flex items-center">
+                                <Clock size={16} className="mr-2 text-gray-400" /> View History
+                            </button>
+                        </div>
+                    </div>
+
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
                         <h3 className="text-xl font-bold text-white mb-6 flex items-center">
                             <User className="mr-3 text-emerald-400" /> Personal Details
@@ -164,10 +366,19 @@ export default function MemberDashboard() {
                                     </h4>
                                     <p className="text-xs text-gray-500 mt-1">PDF or high-res image showing validity dates.</p>
                                 </div>
-                                <div className="mt-4 md:mt-0">
-                                    <label className="bg-gray-800 hover:bg-gray-700 text-white text-sm px-4 py-2 rounded-lg cursor-pointer transition-colors border border-gray-600">
-                                        {user.certificateUrl ? 'Update File' : 'Upload File'}
-                                        <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleFileUpload(e, 'certificate')} />
+                                <div className="mt-4 md:mt-0 flex space-x-3">
+                                    {user.certificateUrl && (
+                                        <button
+                                            onClick={() => handleDeleteFile('certificate')}
+                                            disabled={isDeleting === 'certificate'}
+                                            className="bg-red-500/10 hover:bg-red-500/20 text-red-500 text-sm px-4 py-2 rounded-lg cursor-pointer transition-colors border border-red-500/30"
+                                        >
+                                            {isDeleting === 'certificate' ? '...' : 'Remove'}
+                                        </button>
+                                    )}
+                                    <label className={`bg-gray-800 hover:bg-gray-700 text-white text-sm px-4 py-2 rounded-lg cursor-pointer transition-colors border border-gray-600 ${isUploading === 'certificate' ? 'opacity-50 pointer-events-none' : ''}`}>
+                                        {isUploading === 'certificate' ? 'Uploading...' : (user.certificateUrl ? 'Update File' : 'Upload File')}
+                                        <input type="file" className="hidden" accept=".pdf,image/*" onChange={(e) => handleFileUpload(e, 'certificate')} disabled={isUploading === 'certificate'} />
                                     </label>
                                 </div>
                             </div>
@@ -180,12 +391,38 @@ export default function MemberDashboard() {
                                     </h4>
                                     <p className="text-xs text-gray-500 mt-1">Clear photo for your digital and physical membership cards.</p>
                                 </div>
-                                <div className="mt-4 md:mt-0">
-                                    <label className="bg-gray-800 hover:bg-gray-700 text-white text-sm px-4 py-2 rounded-lg cursor-pointer transition-colors border border-gray-600">
-                                        {user.profilePhotoUrl ? 'Update Photo' : 'Upload Photo'}
-                                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'photo')} />
+                                <div className="mt-4 md:mt-0 flex space-x-3">
+                                    {user.profilePhotoUrl && (
+                                        <button
+                                            onClick={() => handleDeleteFile('photo')}
+                                            disabled={isDeleting === 'photo'}
+                                            className="bg-red-500/10 hover:bg-red-500/20 text-red-500 text-sm px-4 py-2 rounded-lg cursor-pointer transition-colors border border-red-500/30"
+                                        >
+                                            {isDeleting === 'photo' ? '...' : 'Remove'}
+                                        </button>
+                                    )}
+                                    <label className={`bg-gray-800 hover:bg-gray-700 text-white text-sm px-4 py-2 rounded-lg cursor-pointer transition-colors border border-gray-600 ${isUploading === 'photo' ? 'opacity-50 pointer-events-none' : ''}`}>
+                                        {isUploading === 'photo' ? 'Uploading...' : (user.profilePhotoUrl ? 'Update Photo' : 'Upload Photo')}
+                                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'photo')} disabled={isUploading === 'photo'} />
                                     </label>
                                 </div>
+                            </div>
+
+                            {/* Privacy Toggle for Admins */}
+                            <div className="mt-6 pt-6 border-t border-white/10 flex items-center justify-between">
+                                <div>
+                                    <h4 className="font-medium text-white">Document Privacy</h4>
+                                    <p className="text-xs text-gray-500 mt-1 max-w-sm">Allow administrators and staff to view your uploaded firearms license documents for compliance verification.</p>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="sr-only peer"
+                                        checked={user.licenseAccessGranted || false}
+                                        onChange={(e) => handleAccessToggle(e.target.checked)}
+                                    />
+                                    <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                                </label>
                             </div>
                         </div>
                     </div>

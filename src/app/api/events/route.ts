@@ -7,40 +7,40 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
     try {
         const organizationId = await getCurrentOrganizationId();
+
+        // Fetch upcoming events, including a count of current bookings
         const events = await prisma.event.findMany({
-            where: { organizationId },
+            where: {
+                organizationId,
+                date: {
+                    gte: new Date() // Only upcoming events
+                }
+            },
+            include: {
+                _count: {
+                    select: { bookings: true }
+                }
+            },
             orderBy: { date: 'asc' }
         });
-        return NextResponse.json(events);
+
+        // Map it so it's easier to consume on the frontend
+        const formattedEvents = events.map(event => ({
+            id: event.id,
+            title: event.title,
+            description: event.description,
+            date: event.date,
+            signInTime: event.signInTime,
+            startTime: event.startTime,
+            eventType: event.eventType,
+            entryFee: event.entryFee,
+            maxAttendees: event.maxAttendees,
+            currentAttendees: event._count.bookings
+        }));
+
+        return NextResponse.json(formattedEvents);
     } catch (error) {
-        console.error('Error fetching events:', error);
-        return NextResponse.json({ error: 'Failed to fetch events' }, { status: 500 });
-    }
-}
-
-export async function POST(req: Request) {
-    try {
-        const data = await req.json();
-        const { title, description, date, maxAttendees } = data;
-        const organizationId = await getCurrentOrganizationId();
-
-        if (!title || !date) {
-            return NextResponse.json({ error: 'Title and date are required' }, { status: 400 });
-        }
-
-        const newEvent = await prisma.event.create({
-            data: {
-                title,
-                description,
-                date: new Date(date),
-                maxAttendees: maxAttendees ? parseInt(maxAttendees) : null,
-                organizationId
-            }
-        });
-
-        return NextResponse.json(newEvent, { status: 201 });
-    } catch (error) {
-        console.error('Error creating event:', error);
-        return NextResponse.json({ error: 'Failed to create event' }, { status: 500 });
+        console.error('Error fetching member events:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

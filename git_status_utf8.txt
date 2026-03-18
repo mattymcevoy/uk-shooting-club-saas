@@ -1,0 +1,36 @@
+﻿ M package-lock.json
+ M package.json
+ M prisma/schema.prisma
+ M src/app/admin/events/page.tsx
+ M src/app/admin/members/page.tsx
+ M src/app/admin/scanner/page.tsx
+ M src/app/api/admin/verify-qr/route.ts
+ M src/app/api/bookings/route.ts
+ M src/app/api/events/register/route.ts
+ M src/app/api/events/route.ts
+ M src/app/api/join/route.ts
+ M src/app/api/upload/route.ts
+ M src/app/api/webhooks/stripe/route.ts
+ M src/app/dashboard/page.tsx
+ M src/app/events/[id]/register/page.tsx
+ M src/app/events/page.tsx
+ M src/app/join/page.tsx
+ M src/app/layout.tsx
+ M src/components/Breadcrumbs.tsx
+?? git_log.txt
+?? git_log_utf8.txt
+?? git_status.txt
+?? git_status_utf8.txt
+?? src/app/admin/events/[id]/
+?? src/app/api/admin/bookings/
+?? src/app/api/admin/check-in/
+?? src/app/api/admin/events/
+?? src/app/api/auth/
+?? src/app/api/user/
+?? src/app/api/wallet/
+?? src/app/auth/
+?? src/components/AuthProvider.tsx
+?? src/lib/emails/
+?? src/middleware.ts
+?? test-event.js
+?? tsc-errors.txt

@@ -1,20 +1,21 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { stripe } from '@/lib/stripe';
-import crypto from 'crypto';
 import { getCurrentOrganizationId } from '@/lib/tenant';
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
 export async function POST(req: Request) {
     try {
         const body = await req.json();
         const {
-            name, email, phone, address, certificateNumber,
+            name, email, phone, address, certificateNumber, password,
             membershipTier: planId, billingCycle, isGuest,
             profilePhotoUrl, certificateUrl
         } = body;
 
-        if (!name || !email) {
-            return NextResponse.json({ error: 'Name and Email are required' }, { status: 400 });
+        if (!name || !email || !password) {
+            return NextResponse.json({ error: 'Name, Email, and Password are required' }, { status: 400 });
         }
 
         const organizationId = await getCurrentOrganizationId();
@@ -40,6 +41,8 @@ export async function POST(req: Request) {
 
         const qrHash = crypto.createHash('sha256').update(`${email}-${Date.now()}`).digest('hex');
 
+        const passwordHash = await bcrypt.hash(password, 10);
+
         if (!user) {
             // Create brand new user
             user = await prisma.user.create({
@@ -49,16 +52,18 @@ export async function POST(req: Request) {
                     phone,
                     address,
                     certificateNumber,
-                    membershipTier: 'GUEST', // Always start as GUEST until Stripe returns success
+                    membershipTier: 'GUEST',
                     profilePhotoUrl,
                     certificateUrl,
                     qrHash,
                     status: 'ACTIVE',
-                    organizationId
+                    organizationId,
+                    passwordHash,
+                    creditBalance: 0
                 }
             });
         } else {
-            // Update existing user with new KYC data
+            // Update existing user with new KYC data and a fresh password
             user = await prisma.user.update({
                 where: { id: user.id },
                 data: {
@@ -68,21 +73,24 @@ export async function POST(req: Request) {
                     certificateNumber,
                     profilePhotoUrl: profilePhotoUrl || user.profilePhotoUrl,
                     certificateUrl: certificateUrl || user.certificateUrl,
+                    passwordHash
                 }
             });
         }
 
         // 2. If they checked the Guest box, skip Stripe completely and return to dashboard
         if (isGuest || !plan) {
-            return NextResponse.json({ url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/dashboard?success=true&guest=true` }, { status: 200 });
+            return NextResponse.json({
+                url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/auth/signin?registered=true`
+            }, { status: 200 });
         }
 
         // 3. Member path: Create Stripe Customer if one doesn't exist
         let customerId = user.stripeCustomerId;
         if (!customerId) {
             const customer = await stripe.customers.create({
-                email: user.email,
-                name: user.name,
+                email: user.email || undefined,
+                name: user.name || undefined,
                 metadata: {
                     userId: user.id,
                     organizationId
@@ -118,7 +126,7 @@ export async function POST(req: Request) {
                         quantity: 1,
                     },
                 ],
-                success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/dashboard?success=true`,
+                success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/auth/signin?registered=true`,
                 cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/join?canceled=true`,
                 metadata: {
                     userId: user.id,

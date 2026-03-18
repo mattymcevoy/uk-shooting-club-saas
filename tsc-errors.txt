@@ -1,0 +1,2 @@
+﻿src/app/api/events/register/route.ts(146,13): error TS2322: Type 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.

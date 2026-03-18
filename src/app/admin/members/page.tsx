@@ -16,6 +16,7 @@ export default function AdminMembersPage() {
     // Edit Form State
     const [editForm, setEditForm] = useState<Partial<PrismaUser>>({});
     const [isSaving, setIsSaving] = useState(false);
+    const [isRequestingAccess, setIsRequestingAccess] = useState(false);
 
     useEffect(() => {
         fetchMembers();
@@ -69,6 +70,31 @@ export default function AdminMembersPage() {
         }
 
         setIsSaving(false);
+    };
+
+    const handleRequestAccess = async () => {
+        if (!selectedMember) return;
+        setIsRequestingAccess(true);
+
+        try {
+            const res = await fetch('/api/user/access', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: selectedMember.id }),
+            });
+
+            if (res.ok) {
+                await fetchMembers();
+                setSelectedMember({ ...selectedMember, licenseAccessRequested: true });
+                alert('Access request sent to member.');
+            } else {
+                alert('Failed to request access.');
+            }
+        } catch (error) {
+            console.error('Request error', error);
+        }
+
+        setIsRequestingAccess(false);
     };
 
     if (loading) return <div className="p-8 text-center text-emerald-400">Loading Members...</div>;
@@ -218,21 +244,60 @@ export default function AdminMembersPage() {
                                     </label>
                                 </div>
 
-                                {/* Uploaded Documents View */}
-                                <div className="pt-4 border-t border-white/10 space-y-2">
-                                    <h4 className="text-sm font-medium text-gray-400 mb-2">Uploaded Documents</h4>
-
-                                    <div className="flex items-center justify-between bg-black/20 px-3 py-2 rounded border border-white/5">
-                                        <div className="flex items-center space-x-2 text-sm">
-                                            <FileText size={16} className="text-gray-400" />
-                                            <span className="text-gray-300">Firearms Certificate.pdf</span>
-                                        </div>
-                                        {selectedMember.certificateUrl || selectedMember.gunLicenseUrl ? (
-                                            <CheckCircle size={16} className="text-emerald-500" />
+                                {/* Uploaded Documents View with Privacy Controls */}
+                                <div className="pt-4 border-t border-white/10 space-y-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h4 className="text-sm font-medium text-gray-400">Compliance Documents</h4>
+                                        {selectedMember.licenseAccessGranted ? (
+                                            <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs">Access Granted</span>
                                         ) : (
-                                            <XCircle size={16} className="text-red-500" />
+                                            <span className="bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded text-xs">Private</span>
                                         )}
                                     </div>
+
+                                    {!selectedMember.licenseAccessGranted ? (
+                                        <div className="bg-black/20 border border-white/5 rounded-xl p-4 text-center">
+                                            <Shield size={24} className="text-gray-500 mx-auto mb-2" />
+                                            <p className="text-sm text-gray-400 mb-3">
+                                                This member has not granted staff access to view their documents.
+                                            </p>
+                                            <button
+                                                onClick={handleRequestAccess}
+                                                disabled={selectedMember.licenseAccessRequested || isRequestingAccess}
+                                                className="bg-amber-500 hover:bg-amber-400 disabled:bg-gray-700 disabled:text-gray-400 text-black text-sm font-semibold py-1.5 px-4 rounded-lg transition-colors w-full"
+                                            >
+                                                {selectedMember.licenseAccessRequested ? 'Access Requested ✓' : (isRequestingAccess ? 'Requesting...' : 'Request Access')}
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between bg-black/20 px-3 py-3 rounded border border-white/5">
+                                                <div className="flex items-center space-x-2 text-sm">
+                                                    <FileText size={16} className={selectedMember.certificateUrl ? "text-emerald-400" : "text-gray-600"} />
+                                                    {selectedMember.certificateUrl ? (
+                                                        <a href={selectedMember.certificateUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-300 hover:underline">
+                                                            View Firearms Certificate
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-gray-500">No Certificate Uploaded</span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between bg-black/20 px-3 py-3 rounded border border-white/5">
+                                                <div className="flex items-center space-x-2 text-sm">
+                                                    <User size={16} className={selectedMember.profilePhotoUrl ? "text-emerald-400" : "text-gray-600"} />
+                                                    {selectedMember.profilePhotoUrl ? (
+                                                        <a href={selectedMember.profilePhotoUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-300 hover:underline">
+                                                            View Profile Photo
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-gray-500">No Photo Uploaded</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex space-x-3 pt-6">

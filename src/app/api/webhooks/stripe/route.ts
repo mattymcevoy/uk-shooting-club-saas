@@ -1,15 +1,72 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
+import { prisma } from '@/lib/prisma';
 import Stripe from 'stripe';
+import { sendEmail, WalletTopUpEmail } from '@/lib/emails/mailer';
 
 const webhookSecret: string = process.env.STRIPE_WEBHOOK_SECRET || '';
 
 const handleSubscriptionEvent = async (event: Stripe.Event) => {
-    // In a real application, you'd use a Prisma client to update the user's subscription record here
-    // based on the event context, for example:
-    // - invoice.payment_succeeded -> update subscription to ACTIVE
-    // - customer.subscription.deleted -> update to CANCELED
+
+    // 1. Handle Wallet Top-ups
+    if (event.type === 'checkout.session.completed') {
+        const session = event.data.object as Stripe.Checkout.Session;
+
+        if (session.metadata?.type === 'WALLET_TOPUP') {
+            const userId = session.metadata.userId;
+            const amountStr = session.metadata.amount;
+
+            if (userId && amountStr) {
+                const amount = parseInt(amountStr, 10);
+
+                // Idempotency check: Ensure we haven't already processed this payment intent
+                const existingTx = await prisma.walletTransaction.findUnique({
+                    where: { stripePaymentIntentId: session.payment_intent as string }
+                });
+
+                if (!existingTx) {
+                    await prisma.$transaction(async (tx) => {
+                        // Create Ledger Entry
+                        await tx.walletTransaction.create({
+                            data: {
+                                userId,
+                                type: 'DEPOSIT',
+                                amount,
+                                description: `Wallet Top-up via Stripe`,
+                                stripePaymentIntentId: session.payment_intent as string
+                            }
+                        });
+
+                        // Update Balance
+                        const updatedUser = await tx.user.update({
+                            where: { id: userId },
+                            data: {
+                                creditBalance: {
+                                    increment: amount
+                                }
+                            }
+                        });
+
+                        // Fire out an Automated Email Receipt
+                        await sendEmail({
+                            to: updatedUser.email!,
+                            subject: `Digital Wallet Credited: £${(amount / 100).toFixed(2)}`,
+                            react: WalletTopUpEmail({
+                                name: updatedUser.name || 'Member',
+                                amountStr: `£${(amount / 100).toFixed(2)}`,
+                                newBalanceStr: `£${(updatedUser.creditBalance / 100).toFixed(2)}`
+                            })
+                        });
+                    });
+                    console.log(`[Stripe Webhook] Successfully credited £${(amount / 100).toFixed(2)} to user ${userId}`);
+                }
+                return; // Early return to prevent falling into subscription logic
+            }
+        }
+    }
+
+    // 2. Handle Subscriptions (Stub)
     console.log(`Unhandled relevant event! ${event.type}`);
 };
 

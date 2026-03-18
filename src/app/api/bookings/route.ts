@@ -20,12 +20,10 @@ export async function POST(req: Request) {
         const organizationId = await getCurrentOrganizationId();
 
         // 1. Check if user already exists
-        let user = await prisma.user.findUnique({
+        let user = await prisma.user.findFirst({
             where: {
-                email_organizationId: {
-                    email,
-                    organizationId
-                }
+                email,
+                organizationId
             }
         });
 
@@ -68,8 +66,8 @@ export async function POST(req: Request) {
         let customerId = user.stripeCustomerId;
         if (!customerId) {
             const customer = await stripe.customers.create({
-                email: user.email,
-                name: user.name,
+                email: user.email || undefined,
+                name: user.name || undefined,
                 metadata: {
                     userId: user.id
                 }

@@ -1,0 +1,5 @@
+﻿75b7375 HOTFIX: Shifted Guest API skip block before Stripe Customer instantiation
+1a513e8 feat: Implemented Guest vs Member toggle on Registration form to bypass Stripe for Police Compliance scans
+1ddc4c3 HOTFIX: Protected Array.map loops on Pricing APIs to prevent crashing on empty states
+ad9d069 Phase 9: Built the dynamic Membership and B2B SaaS Stripe Subscription Pricing Engine
+1c6ba58 Phase 8: Added HTML5 Live Camera WebRTC integration for member registration

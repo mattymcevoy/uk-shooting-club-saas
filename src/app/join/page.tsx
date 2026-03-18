@@ -14,12 +14,12 @@ export default function JoinUs() {
     // Guest vs Member Mode
     const [isGuest, setIsGuest] = useState(true);
 
-    // Form State
     const [formData, setFormData] = useState({
         name: '',
         email: '',
         phone: '',
         address: '',
+        password: '',
         certificateNumber: '',
         membershipTier: '', // Now stores the dynamic Plan ID
         billingCycle: 'monthly' as 'monthly' | 'annual'
@@ -172,10 +172,10 @@ export default function JoinUs() {
             }
 
             if (data.url) {
-                // Redirect to Stripe Checkout or Dashboard
+                // Redirect to Stripe Checkout or Sign In
                 window.location.href = data.url;
             } else {
-                router.push('/dashboard');
+                router.push('/auth/signin?registered=true');
             }
 
         } catch (err: any) {
@@ -219,6 +219,10 @@ export default function JoinUs() {
                                 <div>
                                     <label className="block text-sm font-bold text-gray-700 mb-1">Phone Number</label>
                                     <input required type="tel" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="+44 7700 900000" />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Password</label>
+                                    <input required type="password" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} className="w-full px-4 py-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Set a secure password" />
                                 </div>
                             </div>
                             <div>
