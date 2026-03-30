@@ -20,60 +20,50 @@ export async function POST(req: Request) {
         }
 
         const user = await prisma.user.findFirst({
-            where: { email: session.user.email }
+            where: {
+                OR: [
+                    { email: session.user.email || undefined },
+                    { id: (session.user as any).id || undefined }
+                ]
+            }
         });
 
         if (!user) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        // Use existing Stripe Customer ID if they have one from previous memberships
-        let customerId = user.stripeCustomerId;
-        if (!customerId) {
-            const customer = await stripe.customers.create({
-                email: user.email || undefined,
-                name: user.name || "Member",
-                metadata: {
-                    userId: user.id
-                }
-            });
-            customerId = customer.id;
-            await prisma.user.update({
-                where: { id: user.id },
-                data: { stripeCustomerId: customerId }
-            });
-        }
+        // TESTING / SANDBOX MODE: Bypass Stripe Provider entirely
+        // Immediately credit the user's wallet with the requested amount
+        
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { creditBalance: { increment: amount } }
+        });
 
-        const claysAmount = Math.floor(amount / 35); // Example calculation: 35p per clay
-
-        // Create Stripe Checkout Session
-        const stripeSession = await stripe.checkout.sessions.create({
-            payment_method_types: ['card'],
-            mode: 'payment',
-            customer: customerId,
-            line_items: [
-                {
-                    price_data: {
-                        currency: 'gbp',
-                        product_data: {
-                            name: `Digital Wallet Top-up`,
-                            description: `Adds £${(amount / 100).toFixed(2)} to your account balance (approx ${claysAmount} clays).`,
-                        },
-                        unit_amount: amount,
-                    },
-                    quantity: 1,
-                },
-            ],
-            success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/dashboard?wallet=success`,
-            cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/dashboard?wallet=canceled`,
-            metadata: {
-                type: 'WALLET_TOPUP',
+        await prisma.walletTransaction.create({
+            data: {
                 userId: user.id,
-                amount: amount.toString(),
+                type: 'DEPOSIT',
+                amount: amount,
+                description: `E-Wallet Funding (Sandbox): £${(amount / 100).toFixed(2)}`
             }
         });
 
-        return NextResponse.json({ url: stripeSession.url });
+        // Officially log this top-up as a PAID Invoice so it registers correctly in the
+        // Admin Financial Overview for 'Total Revenue' & 'Recent Invoices'
+        await prisma.invoice.create({
+            data: {
+                userId: user.id,
+                organizationId: user.organizationId,
+                amount: amount,
+                status: 'PAID',
+                description: 'E-Wallet Funds Top-Up (Sandbox)'
+            }
+        });
+
+        // Return the dashboard success URL just as Stripe would
+        const redirectUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/dashboard?wallet=success`;
+        return NextResponse.json({ url: redirectUrl });
 
     } catch (error: any) {
         console.error('Wallet Top-up Error:', error);

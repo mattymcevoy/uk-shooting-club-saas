@@ -16,9 +16,10 @@ export default function Home() {
             </span>
           </div>
           <div className="flex gap-6 items-center font-semibold text-sm">
-            <Link href="/admin/financials" className="text-gray-600 hover:text-emerald-600 transition-colors">Admin Dashboard</Link>
+            <Link href="/join" className="text-gray-600 hover:text-emerald-600 transition-colors">Join</Link>
+            <Link href="/admin" className="text-gray-600 hover:text-emerald-600 transition-colors">Admin Dashboard</Link>
             <Link href="/admin/facilities" className="text-gray-600 hover:text-emerald-600 transition-colors">Manage Facilities</Link>
-            <Link href="/bookings" className="px-5 py-2.5 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
+            <Link href="/auth/signin" className="px-5 py-2.5 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5">
               Member Portal
             </Link>
           </div>
@@ -41,12 +42,16 @@ export default function Home() {
           A compliant, secure, and beautiful SaaS. Manage memberships, track financials, and automate range bookings from one powerful dashboard.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-4">
+          <Link href="/events" className="group flex items-center justify-center gap-2 px-8 py-4 bg-teal-600 text-white rounded-2xl font-bold text-lg hover:bg-teal-700 transition-all shadow-xl shadow-teal-600/30 hover:shadow-2xl hover:shadow-teal-600/40 hover:-translate-y-1">
+            Book an Event
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+          </Link>
           <Link href="/bookings" className="group flex items-center justify-center gap-2 px-8 py-4 bg-emerald-600 text-white rounded-2xl font-bold text-lg hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/30 hover:shadow-2xl hover:shadow-emerald-600/40 hover:-translate-y-1">
             Book a Range
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </Link>
-          <Link href="/admin/financials" className="flex items-center justify-center px-8 py-4 bg-white text-gray-900 border border-gray-200 rounded-2xl font-bold text-lg hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm">
+          <Link href="/admin" className="flex items-center justify-center px-8 py-4 bg-white text-gray-900 border border-gray-200 rounded-2xl font-bold text-lg hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm">
             Admin Tools
           </Link>
         </div>

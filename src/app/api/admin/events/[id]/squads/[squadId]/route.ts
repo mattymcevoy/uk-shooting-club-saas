@@ -14,7 +14,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         const organizationId = await getCurrentOrganizationId();
         const { id: eventId, squadId } = await params;
         const body = await req.json();
-        const { name, maxCapacity, startTime } = body;
+        const { name, maxCapacity, startTime, startingTrap } = body;
 
         // Verify Event belongs to Org
         const event = await prisma.event.findFirst({
@@ -41,7 +41,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
             data: {
                 name: name !== undefined ? name : undefined,
                 maxCapacity: maxCapacity !== undefined ? parseInt(maxCapacity) : undefined,
-                startTime: startTime !== undefined ? parseTime(event.date.toISOString(), startTime) : undefined
+                startTime: startTime !== undefined ? (startTime ? parseTime(event.date.toISOString(), startTime) : null) : undefined,
+                startingTrap: startingTrap !== undefined ? (startingTrap || null) : undefined
             }
         });
 

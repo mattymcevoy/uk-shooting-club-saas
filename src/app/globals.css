@@ -12,6 +12,33 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@theme {
+  /* E.J. Churchill Signature Palette Override */
+  --color-emerald-50: #f0f3ff;
+  --color-emerald-100: #e0e8ff;
+  --color-emerald-200: #c1d2ff;
+  --color-emerald-300: #93b3ff;
+  --color-emerald-400: #116dff; /* Churchill Bright Royal Blue */
+  --color-emerald-500: #384AD3; /* Churchill Active Indigo */
+  --color-emerald-600: #2b5672; /* Churchill Slate */
+  --color-emerald-700: #1E2141; /* Churchill Primary Midnight Navy */
+  --color-emerald-800: #15182e;
+  --color-emerald-900: #0a0b18;
+  --color-emerald-950: #05060d;
+
+  --color-teal-50: #eef9f9;
+  --color-teal-100: #d4f0f0;
+  --color-teal-200: #ade2e2;
+  --color-teal-300: #7bcecd;
+  --color-teal-400: #57BBB9; /* Churchill Action Mint/Teal */
+  --color-teal-500: #3ea09e;
+  --color-teal-600: #308080;
+  --color-teal-700: #296868;
+  --color-teal-800: #235354;
+  --color-teal-900: #1f4546;
+  --color-teal-950: #0e2728;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;

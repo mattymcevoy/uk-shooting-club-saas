@@ -1,0 +1,76 @@
+﻿Fetching or creating organization...
+node.exe : Error: Connection 
+terminated unexpectedly
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~
+    + CategoryInfo          : 
+    NotSpecified: (Error: Co  
+  nnecti...ed unexpectedly:   
+ String) [], RemoteExcepti    
+on
+    + FullyQualifiedErrorId : 
+    NativeCommandError
+ 
+    at C:\Users\matty\.gemini\
+antigravity\scratch\uk-shootin
+g-club\node_modules\pg-pool\in
+dex.js:45:11
+    at process.processTicksAnd
+Rejections (node:internal/proc
+ess/task_queues:103:5)
+    at async 
+PrismaPgAdapter.performIO (C:\
+Users\matty\.gemini\antigravit
+y\scratch\uk-shooting-club\nod
+e_modules\@prisma\adapter-pg\d
+ist\index.js:652:22)
+    at async 
+PrismaPgAdapter.queryRaw (C:\U
+sers\matty\.gemini\antigravity
+\scratch\uk-shooting-club\node
+_modules\@prisma\adapter-pg\di
+st\index.js:602:30)
+    at async e.interpretNode (
+C:\Users\matty\.gemini\antigra
+vity\scratch\uk-shooting-club\
+node_modules\@prisma\client-en
+gine-runtime\src\interpreter\q
+uery-interpreter.ts:186:26)
+    at async e.interpretNode (
+C:\Users\matty\.gemini\antigra
+vity\scratch\uk-shooting-club\
+node_modules\@prisma\client-en
+gine-runtime\src\interpreter\q
+uery-interpreter.ts:213:41)
+    at async e.interpretNode (
+C:\Users\matty\.gemini\antigra
+vity\scratch\uk-shooting-club\
+node_modules\@prisma\client-en
+gine-runtime\src\interpreter\q
+uery-interpreter.ts:272:41)
+    at async e.run (C:\Users\m
+atty\.gemini\antigravity\scrat
+ch\uk-shooting-club\node_modul
+es\@prisma\client-engine-runti
+me\src\interpreter\query-inter
+preter.ts:94:23)
+    at async e.execute (C:\Use
+rs\matty\.gemini\antigravity\s
+cratch\uk-shooting-club\node_m
+odules\@prisma\client\src\runt
+ime\core\engines\client\LocalE
+xecutor.ts:81:12)
+    at async jt.request (C:\Us
+ers\matty\.gemini\antigravity\
+scratch\uk-shooting-club\node_
+modules\@prisma\client\src\run
+time\core\engines\client\Clien
+tEngine.ts:492:22) {
+  clientVersion: '7.4.2'
+}

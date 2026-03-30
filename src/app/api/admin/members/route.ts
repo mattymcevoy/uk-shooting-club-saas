@@ -46,6 +46,15 @@ export async function PUT(request: Request) {
             return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
         }
 
+        const rawUser: any[] = await prisma.$queryRawUnsafe(`SELECT * FROM "User" WHERE id = $1`, id);
+        const physicalUser = rawUser[0] || {};
+        let newMembershipNumber = physicalUser.membershipNumber || null;
+
+        if (!newMembershipNumber && (membershipTier === 'FULL_MEMBER' || membershipTier === 'VIP')) {
+            newMembershipNumber = "NRS-" + String(Math.floor(Math.random() * 9000000) + 1000000);
+        }
+
+        // Standard ORM handles legacy attributes unaffected by strict cached schema mismatches natively
         const updatedUser = await prisma.user.update({
             where: { id },
             data: {
@@ -57,6 +66,12 @@ export async function PUT(request: Request) {
                 isRegisteredShooter: Boolean(isRegisteredShooter),
             },
         });
+
+        // Forcefully map newly instantiated membership validations bridging Postgres securely!
+        if (newMembershipNumber) {
+            await prisma.$executeRawUnsafe(`UPDATE "User" SET "membershipNumber" = $1 WHERE id = $2`, newMembershipNumber, id);
+            (updatedUser as any).membershipNumber = newMembershipNumber;
+        }
 
         return NextResponse.json(updatedUser);
     } catch (error) {

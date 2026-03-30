@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Target, Users, CreditCard, Calendar, Settings, QrCode, UserPlus } from 'lucide-react';
+import { Target, Users, CreditCard, Calendar, Settings, QrCode, UserPlus, ShoppingBag } from 'lucide-react';
 
 export default function AdminDashboardPage() {
 
@@ -59,6 +59,14 @@ export default function AdminDashboardPage() {
             icon: Settings,
             color: 'bg-gray-500/20 text-gray-400 border-gray-500/30 hover:border-gray-500',
             bgGlow: 'group-hover:bg-gray-500/10'
+        },
+        {
+            title: 'Shooting Products',
+            description: 'Manage E-Wallet reload packages, digital clays, physical goods, and promotional event tickets.',
+            href: '/admin/products',
+            icon: ShoppingBag,
+            color: 'bg-orange-500/20 text-orange-400 border-orange-500/30 hover:border-orange-500',
+            bgGlow: 'group-hover:bg-orange-500/10'
         }
     ];
 

@@ -8,12 +8,17 @@ export async function GET() {
     try {
         const organizationId = await getCurrentOrganizationId();
 
-        // Fetch upcoming events, including a count of current bookings
+        const now = new Date();
+        const fiveYearsFromNow = new Date();
+        fiveYearsFromNow.setFullYear(now.getFullYear() + 5);
+
+        // Fetch upcoming events for up to 5 years, including a count of current bookings
         const events = await prisma.event.findMany({
             where: {
                 organizationId,
                 date: {
-                    gte: new Date() // Only upcoming events
+                    gte: now, // Only upcoming events
+                    lte: fiveYearsFromNow // Up to 5 years in the future
                 }
             },
             include: {

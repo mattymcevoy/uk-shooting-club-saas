@@ -31,6 +31,7 @@ model Organization {
   invoices    Invoice[]
   subscriptions Subscription[]
   membershipPlans MembershipPlan[]
+  products    Product[]
 }
 
 // ==========================================
@@ -83,6 +84,7 @@ model User {
   isRegisteredShooter  Boolean @default(false)
   address              String?
   certificateNumber    String?
+  membershipNumber     String? @unique
   
   // File Upload References (Vercel Blob URLs)
   profilePhotoUrl      String?
@@ -96,8 +98,9 @@ model User {
   // Security Hash for Membership QR
   qrHash               String? @unique
 
-  // E-Wallet (Digital Clays)
-  creditBalance        Int @default(0) // Balance in 'Digital Clays' or pennies
+  // E-Wallet (Digital Clays and Cash)
+  creditBalance        Int @default(5000) // Balance in pennies (£50 = 5000)
+  clayBalance          Int @default(100) // Balance in Digital Clays
 
   // Relations
   accounts      Account[]
@@ -329,11 +332,36 @@ model Squad {
   name        String   // e.g. "Squad 1"
   startTime   DateTime?
   maxCapacity Int      @default(6)
+  startingTrap String? // E.g., Trap 1, Stand A, etc.
   
   bookings    Booking[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// ==========================================
+// Phase 10: Retail Products / Shop
+// ==========================================
+
+model Product {
+  id          String   @id @default(cuid())
+  
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name         String
+  description  String?
+  price        Int      // in pennies
+  isDigital    Boolean  @default(false) // e.g. digital clays
+  claysAmount  Int?     // For digital top-up packages
+
+  isActive     Boolean  @default(true)
+  stock        Int      @default(0) // Inventory tracking for physical goods
+  expiresAt    DateTime? // User requested: "They must have expiry date."
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 // ==========================================

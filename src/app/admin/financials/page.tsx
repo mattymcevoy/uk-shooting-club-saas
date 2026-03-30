@@ -15,7 +15,14 @@ export default async function FinancialDashboard() {
     const recentBookings = await prisma.booking.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
-        include: { user: true, facility: true },
+        include: { user: true, facility: true, event: true },
+    });
+
+    // Fetch Recent E-Wallet Transactions (Deposits and Purchases)
+    const recentTransactions = await prisma.walletTransaction.findMany({
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+        include: { user: true },
     });
 
     // Calculate total revenue from paid invoices and bookings
@@ -33,12 +40,19 @@ export default async function FinancialDashboard() {
     const totalBookingRevenue = (paidBookingsAggregation._sum.amountPaid || 0) / 100;
     const totalRevenue = totalInvoiceRevenue + totalBookingRevenue;
 
+    // Aggregate global e-wallet liabilities (what the club holds physically on behalf of members)
+    const eWalletAggregation = await prisma.user.aggregate({
+        _sum: { creditBalance: true },
+        where: { creditBalance: { gt: 0 } }
+    });
+    const totalEWalletFunds = (eWalletAggregation._sum.creditBalance || 0) / 100;
+
     return (
         <div className="p-8 max-w-7xl mx-auto font-sans">
             <h1 className="text-4xl font-extrabold mb-8 text-gray-900 tracking-tight">Financial Overview</h1>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
                 <div className="bg-white/80 backdrop-blur-md p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center">
                     <h2 className="text-gray-500 text-sm font-semibold uppercase tracking-wider mb-2">Total Revenue</h2>
                     <p className="text-5xl font-black text-emerald-600">£{totalRevenue.toFixed(2)}</p>
@@ -51,6 +65,17 @@ export default async function FinancialDashboard() {
                     <h2 className="text-gray-500 text-sm font-semibold uppercase tracking-wider mb-2">Booking Revenue</h2>
                     <p className="text-5xl font-black text-indigo-600">£{totalBookingRevenue.toFixed(2)}</p>
                 </div>
+                
+                {/* Selectable E-Wallet Tile */}
+                <a href="/admin/financials/e-wallets" className="block group">
+                    <div className="bg-gradient-to-br from-gray-900 to-black p-6 rounded-2xl shadow-lg border border-emerald-500/20 flex flex-col justify-center h-full transition-transform transform group-hover:-translate-y-1 group-hover:shadow-emerald-900/30">
+                        <h2 className="text-gray-400 text-sm font-semibold uppercase tracking-wider mb-2 group-hover:text-gray-300">Total E-Wallet Funds</h2>
+                        <p className="text-4xl font-black text-emerald-400">£{totalEWalletFunds.toFixed(2)}</p>
+                        <p className="text-xs text-gray-500 mt-2 flex items-center">
+                            View Detailed Wallet Audit <span className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                        </p>
+                    </div>
+                </a>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -90,7 +115,7 @@ export default async function FinancialDashboard() {
                             {recentBookings.map((booking: any) => (
                                 <li key={booking.id} className="flex items-center justify-between p-4 rounded-xl hover:bg-white/60 transition-colors">
                                     <div>
-                                        <p className="font-semibold text-gray-900">{booking.facility.name}</p>
+                                        <p className="font-semibold text-gray-900">{booking.facility?.name || booking.event?.title || 'Event Booking'}</p>
                                         <p className="text-sm text-gray-500">
                                             {booking.user.name} • {format(new Date(booking.startTime), 'MMM d, h:mm a')}
                                         </p>
@@ -107,6 +132,49 @@ export default async function FinancialDashboard() {
                         </ul>
                     )}
                 </div>
+            </div>
+
+            {/* E-Wallet Transaction Receipts Log */}
+            <div className="mt-8 bg-white/70 backdrop-blur-lg rounded-3xl p-8 shadow-sm border border-gray-100 mb-12">
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">Digital Wallet Activity Log</h2>
+                {recentTransactions.length === 0 ? (
+                    <p className="text-gray-500 italic">No wallet transactions recorded yet.</p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="border-b border-gray-100">
+                                    <th className="py-3 px-4 font-semibold text-gray-600">Date/Time</th>
+                                    <th className="py-3 px-4 font-semibold text-gray-600">Member Name</th>
+                                    <th className="py-3 px-4 font-semibold text-gray-600">Membership Number</th>
+                                    <th className="py-3 px-4 font-semibold text-gray-600">Transaction Details</th>
+                                    <th className="py-3 px-4 font-semibold text-gray-600">Type</th>
+                                    <th className="py-3 px-4 font-semibold text-gray-600 text-right">Value Initiated</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {recentTransactions.map((tx: any) => (
+                                    <tr key={tx.id} className="border-b border-gray-50 hover:bg-white/60 transition-colors">
+                                        <td className="py-4 px-4 text-sm text-gray-500">{format(new Date(tx.createdAt), 'MMM d, yyyy HH:mm')}</td>
+                                        <td className="py-4 px-4 font-bold text-gray-900">{tx.user?.name || "Unknown"}</td>
+                                        <td className="py-4 px-4 font-mono text-sm text-gray-600">{tx.user?.membershipNumber || "N/A"}</td>
+                                        <td className="py-4 px-4 text-gray-700">{tx.description || "N/A"}</td>
+                                        <td className="py-4 px-4">
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                                                tx.type === 'DEPOSIT' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                                            }`}>
+                                                {tx.type}
+                                            </span>
+                                        </td>
+                                        <td className={`py-4 px-4 text-right font-bold ${tx.amount > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            {tx.amount > 0 ? '+' : ''}£{(tx.amount / 100).toFixed(2)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
         </div>
     );

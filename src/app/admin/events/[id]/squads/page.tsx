@@ -14,7 +14,7 @@ export default function SquadManagementPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [saving, setSaving] = useState<string | null>(null);
-    const [editingSquad, setEditingSquad] = useState<{ id: string, name: string, maxCapacity: number, startTime: string | null } | null>(null);
+    const [editingSquad, setEditingSquad] = useState<{ id: string, name: string, maxCapacity: number, startTime: string | null, startingTrap: string | null } | null>(null);
     const [editingShooter, setEditingShooter] = useState<{ id: string, attendeeName: string, startStand: string } | null>(null);
 
     useEffect(() => {
@@ -315,7 +315,7 @@ export default function SquadManagementPage() {
                                     {editingSquad?.id === sq.id ? (
                                         <form onSubmit={handleUpdateSquad} className="space-y-4 mb-4 border-b border-white/10 pb-4">
                                             <div className="flex justify-between items-center mb-2">
-                                                <h3 className="font-bold text-lg text-white">Edit Squad</h3>
+                                                <h3 className="font-bold text-lg text-white group-hover:text-emerald-400">Editing: {sq.name}</h3>
                                                 <button type="button" onClick={() => setEditingSquad(null)} className="text-gray-400 hover:text-white">
                                                     <X size={18} />
                                                 </button>
@@ -342,13 +342,23 @@ export default function SquadManagementPage() {
                                                         required
                                                     />
                                                 </div>
-                                                <div className="col-span-2">
+                                                <div>
                                                     <label className="block text-xs text-gray-400 mb-1">Start Time (Optional)</label>
                                                     <input
                                                         type="time"
                                                         value={formatTimeForInput(editingSquad!.startTime)}
                                                         onChange={e => setEditingSquad({ ...editingSquad!, startTime: e.target.value })}
                                                         className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 [color-scheme:dark]"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-gray-400 mb-1">Starting Trap (Optional)</label>
+                                                    <input
+                                                        type="text"
+                                                        value={editingSquad!.startingTrap || ''}
+                                                        onChange={e => setEditingSquad({ ...editingSquad!, startingTrap: e.target.value })}
+                                                        className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
+                                                        placeholder="e.g. Trap 1"
                                                     />
                                                 </div>
                                             </div>
@@ -364,14 +374,19 @@ export default function SquadManagementPage() {
                                         <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-2">
                                             <div className="flex items-center space-x-3">
                                                 <h3 className="font-bold text-lg text-white">{sq.name}</h3>
+                                                <button onClick={() => setEditingSquad({ ...sq, startingTrap: sq.startingTrap || '' })} className="text-gray-500 hover:text-emerald-400 transition-colors">
+                                                    <Edit2 size={14} />
+                                                </button>
                                                 {sq.startTime && (
-                                                    <span className="text-xs text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                                                    <span className="text-xs text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 rounded-full ml-4">
                                                         {new Date(sq.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                     </span>
                                                 )}
-                                                <button onClick={() => setEditingSquad(sq)} className="text-gray-500 hover:text-emerald-400 transition-colors">
-                                                    <Edit2 size={14} />
-                                                </button>
+                                                {sq.startingTrap && (
+                                                    <span className="text-xs text-indigo-400 border border-indigo-500/30 bg-indigo-500/10 px-2 py-0.5 rounded-full uppercase font-black">
+                                                        Trap: {sq.startingTrap}
+                                                    </span>
+                                                )}
                                             </div>
                                             <span className={`text-xs font-bold px-2 py-1 rounded-md ${isFull ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/10 text-gray-400'}`}>
                                                 {squadMembers.length} / {sq.maxCapacity} Filled

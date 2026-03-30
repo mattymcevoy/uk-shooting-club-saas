@@ -20,6 +20,10 @@ export default function MemberDashboard() {
     const [isUploading, setIsUploading] = useState<'certificate' | 'photo' | null>(null);
     const [isDeleting, setIsDeleting] = useState<'certificate' | 'photo' | null>(null);
 
+    // Dynamic Shop State
+    const [purchasables, setPurchasables] = useState<any[]>([]);
+    const [selectedItem, setSelectedItem] = useState<string>('');
+
     useEffect(() => {
         if (status === 'unauthenticated') {
             router.push('/auth/signin');
@@ -27,23 +31,41 @@ export default function MemberDashboard() {
         }
 
         if (status === 'authenticated') {
-            const fetchProfile = async () => {
+            const fetchDashboardData = async () => {
                 try {
-                    const res = await fetch('/api/user/me');
-                    if (res.ok) {
-                        const data = await res.json();
+                    const [resProfile, resProducts, resEvents] = await Promise.all([
+                        fetch('/api/user/me'),
+                        fetch('/api/products'),
+                        fetch('/api/events')
+                    ]);
+                    
+                    if (resProfile.ok) {
+                        const data = await resProfile.json();
                         setUser(data);
-                    } else {
-                        console.error('Failed to fetch user profile');
+                    }
+
+                    const combined: any[] = [];
+                    if (resProducts.ok) {
+                        const prods = await resProducts.json();
+                        prods.forEach((p: any) => combined.push({ ...p, buyType: 'product', label: `${p.name} (£${(p.price/100).toFixed(2)})` }));
+                    }
+                    if (resEvents.ok) {
+                        const evts = await resEvents.json();
+                        evts.forEach((e: any) => combined.push({ ...e, buyType: 'event', label: `Event: ${e.title} (£${(e.entryFee/100).toFixed(2)})`, price: e.entryFee }));
+                    }
+                    
+                    setPurchasables(combined);
+                    if (combined.length > 0) {
+                        setSelectedItem(`${combined[0].buyType}_${combined[0].id}`);
                     }
                 } catch (error) {
-                    console.error('Error fetching profile:', error);
+                    console.error('Error fetching dashboard data:', error);
                 } finally {
                     setLoading(false);
                 }
             };
 
-            fetchProfile();
+            fetchDashboardData();
         }
 
         // Grab temp password if it exists from signup redirection
@@ -60,7 +82,7 @@ export default function MemberDashboard() {
             const res = await fetch('/api/wallet/topup', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ amount: 3500, description: "100 Clays Topup" }) // Hardcoded approx 100 clays for £35 as requested
+                body: JSON.stringify({ amount: 5000, description: "Add funds £50" })
             });
             const data = await res.json();
 
@@ -151,6 +173,49 @@ export default function MemberDashboard() {
             }
         } catch (error) {
             console.error('Error updating access:', error);
+        }
+    };
+
+    // New state for form editing
+    const [isEditing, setIsEditing] = useState(false);
+    const [editForm, setEditForm] = useState({
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        certificateNumber: '',
+        membershipNumber: ''
+    });
+    
+    useEffect(() => {
+        if (user && !isEditing) {
+            setEditForm({
+                name: user.name || '',
+                email: user.email || '',
+                phone: user.phone || '',
+                address: user.address || '',
+                certificateNumber: user.certificateNumber || '',
+                membershipNumber: user.membershipNumber || ''
+            });
+        }
+    }, [user, isEditing]);
+
+    const handleSaveProfile = async () => {
+        try {
+            const res = await fetch('/api/user/me', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(editForm)
+            });
+            if (res.ok) {
+                const updatedUser = await res.json();
+                setUser(updatedUser);
+                setIsEditing(false);
+            } else {
+                alert("Failed to update profile. Please try again.");
+            }
+        } catch (error) {
+            console.error(error);
         }
     };
 
@@ -273,8 +338,7 @@ export default function MemberDashboard() {
                         </div>
 
                         <div className="mt-8 border-t border-white/10 pt-4 flex justify-between tracking-wide text-xs">
-                            <div className="text-gray-400">STATUS: <span className="text-emerald-400 ml-1">{user.status}</span></div>
-                            <div className="text-gray-400 text-right">Joined: <span className="text-white ml-1">{new Date(user.createdAt).getFullYear()}</span></div>
+                           <div className="text-gray-400 font-bold">NRS: <span className="text-white ml-1">{user.membershipNumber || 'PENDING'}</span></div>
                         </div>
                     </div>
                 </div>
@@ -301,7 +365,7 @@ export default function MemberDashboard() {
                                     £{((user.creditBalance || 0) / 100).toFixed(2)}
                                 </div>
                                 <div className="text-xs text-emerald-500/70 font-bold uppercase tracking-widest mt-1">
-                                    ~ {Math.floor((user.creditBalance || 0) / 35)} Clays Available
+                                    {user.clayBalance || 0} Clays Available
                                 </div>
                             </div>
                         </div>
@@ -309,41 +373,131 @@ export default function MemberDashboard() {
                             <button
                                 onClick={handleTopUp}
                                 disabled={isToppingUp}
-                                className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 flex items-center"
+                                className="px-6 py-2.5 bg-black/50 border border-white/10 hover:border-white/30 text-emerald-400 font-bold rounded-xl transition-all shadow-lg flex items-center shrink-0 disabled:opacity-50"
                             >
-                                {isToppingUp ? 'Processing...' : 'Load 100 Clays (£35)'}
+                                {isToppingUp ? 'Processing...' : 'Add Funds (£50)'}
                             </button>
-                            <button className="px-6 py-2.5 bg-black/50 border border-white/10 hover:border-white/30 text-white font-medium rounded-xl transition-all flex items-center">
-                                <Clock size={16} className="mr-2 text-gray-400" /> View History
+                            
+                            <div className="flex-1 flex flex-col md:flex-row items-stretch gap-2 bg-black/30 p-2 rounded-2xl border border-white/5">
+                                <select 
+                                    value={selectedItem}
+                                    onChange={e => setSelectedItem(e.target.value)}
+                                    className="flex-1 px-4 py-2.5 bg-transparent border-none focus:ring-0 text-white font-medium text-sm disabled:opacity-50"
+                                    disabled={purchasables.length === 0}
+                                >
+                                    {purchasables.length === 0 && <option value="">No items available</option>}
+                                    {purchasables.map(p => (
+                                        <option key={`${p.buyType}_${p.id}`} value={`${p.buyType}_${p.id}`} className="bg-gray-900 text-white">
+                                            {p.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                
+                                <button
+                                    onClick={async () => {
+                                        if (!selectedItem) return;
+                                        setIsToppingUp(true);
+                                        try {
+                                            const firstUnderscore = selectedItem.indexOf('_');
+                                            const type = selectedItem.slice(0, firstUnderscore);
+                                            const id = selectedItem.slice(firstUnderscore + 1);
+                                            
+                                            const res = await fetch('/api/wallet/purchase', { 
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ type, id })
+                                            });
+                                            if (res.ok) {
+                                                alert("Purchase successful! Funds have been deducted from your E-Wallet.");
+                                                window.location.reload();
+                                            } else {
+                                                const error = await res.json();
+                                                alert(error.error || "Transaction failed.");
+                                            }
+                                        } finally {
+                                            setIsToppingUp(false);
+                                        }
+                                    }}
+                                    disabled={isToppingUp || purchasables.length === 0}
+                                    className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl transition-all shadow-lg shrink-0 disabled:opacity-50 disabled:bg-gray-700 disabled:text-gray-500"
+                                >
+                                    Purchase
+                                </button>
+                            </div>
+                            
+                            <button className="px-4 py-2.5 bg-black/50 border border-white/10 hover:border-white/30 text-white font-medium rounded-xl transition-all flex items-center shrink-0">
+                                <Clock size={16} />
                             </button>
                         </div>
                     </div>
 
                     <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-                        <h3 className="text-xl font-bold text-white mb-6 flex items-center">
-                            <User className="mr-3 text-emerald-400" /> Personal Details
-                        </h3>
+                        <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+                            <h3 className="text-xl font-bold text-white flex items-center">
+                                <User className="mr-3 text-emerald-400" /> Personal Details
+                            </h3>
+                            {isEditing ? (
+                                <div className="flex gap-2">
+                                    <button onClick={() => setIsEditing(false)} className="text-sm px-3 py-1.5 text-gray-400 hover:text-white transition-colors">Cancel</button>
+                                    <button onClick={handleSaveProfile} className="text-sm px-3 py-1.5 bg-emerald-500 text-black font-semibold rounded-lg hover:bg-emerald-400 transition-colors">Save</button>
+                                </div>
+                            ) : (
+                                <button onClick={() => setIsEditing(true)} className="text-sm px-3 py-1.5 bg-black border border-emerald-500/50 text-emerald-400 font-semibold rounded-lg hover:bg-emerald-500/10 transition-colors">Edit Profile</button>
+                            )}
+                        </div>
                         <div className="grid grid-cols-2 gap-6 text-sm">
                             <div>
+                                <p className="text-gray-500 mb-1">Full Name</p>
+                                {isEditing ? (
+                                    <input type="text" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white outline-none focus:border-emerald-500" />
+                                ) : (
+                                    <p className="font-medium text-white">{user.name}</p>
+                                )}
+                            </div>
+                            <div>
                                 <p className="text-gray-500 mb-1">Email Address</p>
-                                <p className="font-medium text-white">{user.email}</p>
+                                {isEditing ? (
+                                    <input type="email" value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white outline-none focus:border-emerald-500" />
+                                ) : (
+                                    <p className="font-medium text-white">{user.email}</p>
+                                )}
                             </div>
                             <div>
                                 <p className="text-gray-500 mb-1">Mobile Number</p>
-                                <p className="font-medium text-white">{user.phone || 'Not provided'}</p>
-                            </div>
-                            <div className="col-span-2">
-                                <p className="text-gray-500 mb-1">Full Postal Address</p>
-                                <p className="font-medium text-white whitespace-pre-line">{user.address || 'Not provided'}</p>
+                                {isEditing ? (
+                                    <input type="text" value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white outline-none focus:border-emerald-500" />
+                                ) : (
+                                    <p className="font-medium text-white">{user.phone || 'Not provided'}</p>
+                                )}
                             </div>
                             <div>
                                 <p className="text-gray-500 mb-1">Certificate Number</p>
-                                <p className="font-medium text-white">{user.certificateNumber || 'Not provided'}</p>
+                                {isEditing ? (
+                                    <input type="text" value={editForm.certificateNumber} onChange={e => setEditForm({...editForm, certificateNumber: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white outline-none focus:border-emerald-500" />
+                                ) : (
+                                    <p className="font-medium text-white">{user.certificateNumber || 'Not provided'}</p>
+                                )}
                             </div>
                             <div>
-                                <p className="text-gray-500 mb-1">License Holder</p>
+                                <p className="text-gray-500 mb-1">Membership Number</p>
+                                {isEditing ? (
+                                    <input type="text" value={editForm.membershipNumber} onChange={e => setEditForm({...editForm, membershipNumber: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white outline-none focus:border-emerald-500" />
+                                ) : (
+                                    <p className="font-medium text-white">{user.membershipNumber || 'PENDING'}</p>
+                                )}
+                            </div>
+                            <div className="col-span-2">
+                                <p className="text-gray-500 mb-1">Full Postal Address</p>
+                                {isEditing ? (
+                                    <textarea value={editForm.address} onChange={e => setEditForm({...editForm, address: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-white outline-none focus:border-emerald-500" rows={2}/>
+                                ) : (
+                                    <p className="font-medium text-white whitespace-pre-line">{user.address || 'Not provided'}</p>
+                                )}
+                            </div>
+                            <div className="col-span-2 pt-2 border-t border-white/5">
+                                <p className="text-gray-500 mb-1">License Holder Verification</p>
                                 <p className="font-medium text-white flex items-center">
-                                    {user.isLicenseHolder ? <><CheckCircle size={16} className="text-emerald-400 mr-2" /> Verified</> : 'Pending Verification'}
+                                    {user.isLicenseHolder ? <><CheckCircle size={16} className="text-emerald-400 mr-2" /> Verified securely by Staff Admin</> : 'Pending Admin Verification'}
                                 </p>
                             </div>
                         </div>

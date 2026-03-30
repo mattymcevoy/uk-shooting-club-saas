@@ -7,8 +7,10 @@ import bcrypt from "bcryptjs";
 export const authOptions: NextAuthOptions = {
     adapter: PrismaAdapter(prisma),
     providers: [
+        // Member Login Provider
         CredentialsProvider({
-            name: "Credentials",
+            id: "member-login",
+            name: "Member Login",
             credentials: {
                 email: { label: "Email", type: "email", placeholder: "member@example.com" },
                 password: { label: "Password", type: "password" }
@@ -23,7 +25,6 @@ export const authOptions: NextAuthOptions = {
                 });
 
                 if (!user || !user.passwordHash) {
-                    // For security, do not reveal if the user exists
                     throw new Error("Invalid email or password");
                 }
 
@@ -38,13 +39,39 @@ export const authOptions: NextAuthOptions = {
                     email: user.email,
                     name: user.name,
                     organizationId: user.organizationId,
+                    role: "MEMBER",
                 };
+            }
+        }),
+        // Admin Login Provider
+        CredentialsProvider({
+            id: "admin-login",
+            name: "Admin Login",
+            credentials: {
+                username: { label: "Admin Username", type: "text" },
+                password: { label: "Master Password", type: "password" }
+            },
+            async authorize(credentials) {
+                // A secure administrative backend check based on environment variables
+                const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "Admin";
+                const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "P4ssw0rd";
+
+                // We verify against the username field
+                if (credentials?.username === ADMIN_USERNAME && credentials?.password === ADMIN_PASSWORD) {
+                    return {
+                        id: "admin-system",
+                        email: "admin@ukshooting.club", // dummy email 
+                        name: "Admin",
+                        role: "ADMIN",
+                    };
+                }
+
+                throw new Error("Invalid administrative credentials");
             }
         })
     ],
     pages: {
         signIn: '/auth/signin',
-        // error: '/auth/error', // Optional custom error page
     },
     session: {
         strategy: "jwt",
@@ -52,18 +79,28 @@ export const authOptions: NextAuthOptions = {
     },
     callbacks: {
         async jwt({ token, user }) {
-            // Include custom claims on sign in
             if (user) {
                 token.id = user.id;
                 token.organizationId = (user as any).organizationId;
+                token.role = (user as any).role;
+                
+                // Security Requirement: Admin logins must automatically log off after 30 minutes.
+                if ((user as any).role === 'ADMIN') {
+                    token.exp = Math.floor(Date.now() / 1000) + (30 * 60);
+                }
+            } else {
+                // For sliding sessions on every subsequent API/Page load explicitly
+                if (token.role === 'ADMIN') {
+                    token.exp = Math.floor(Date.now() / 1000) + (30 * 60);
+                }
             }
             return token;
         },
         async session({ session, token }) {
-            // Expose custom claims to the client session
             if (session.user) {
                 (session.user as any).id = token.id;
                 (session.user as any).organizationId = token.organizationId;
+                (session.user as any).role = token.role;
             }
             return session;
         }

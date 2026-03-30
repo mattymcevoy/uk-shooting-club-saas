@@ -31,13 +31,14 @@ export default function JoinUs() {
         // Fetch dynamic membership tiers
         const fetchPlans = async () => {
             try {
-                const res = await fetch('/api/admin/settings/pricing');
+                const res = await fetch('/api/admin/financials/plans');
                 const data = await res.json();
 
                 if (Array.isArray(data)) {
-                    setPlans(data);
-                    if (data.length > 0) {
-                        setFormData(prev => ({ ...prev, membershipTier: data[0].id }));
+                    const activePlans = data.filter((p: any) => p.isActive);
+                    setPlans(activePlans);
+                    if (activePlans.length > 0) {
+                        setFormData(prev => ({ ...prev, membershipTier: activePlans[0].id }));
                     }
                 } else {
                     console.error("API did not return an array:", data);
@@ -370,21 +371,37 @@ export default function JoinUs() {
                                                     key={plan.id}
                                                     type="button"
                                                     onClick={() => setFormData({ ...formData, membershipTier: plan.id })}
-                                                    className={`w-full text-left p-6 rounded-2xl border-2 transition-all ${formData.membershipTier === plan.id
-                                                        ? 'border-emerald-500 bg-emerald-50'
-                                                        : 'border-gray-100 hover:border-gray-200 bg-white'
+                                                    className={`w-full text-left p-6 rounded-3xl border-2 transition-all group ${
+                                                        formData.membershipTier === plan.id
+                                                            ? 'border-emerald-500 bg-emerald-50/50 shadow-md shadow-emerald-500/10'
+                                                            : 'border-gray-100 hover:border-gray-200 bg-white hover:bg-gray-50'
                                                         }`}
                                                 >
-                                                    <div className="flex justify-between items-start">
+                                                    <div className="flex justify-between items-start mb-4">
                                                         <div>
-                                                            <h3 className={`font-bold text-lg ${formData.membershipTier === plan.id ? 'text-emerald-900' : 'text-gray-900'}`}>{plan.name}</h3>
-                                                            <p className="text-sm text-gray-500 mt-1">{plan.description}</p>
+                                                            <h3 className={`font-extrabold text-xl ${formData.membershipTier === plan.id ? 'text-emerald-900' : 'text-gray-900'}`}>
+                                                                {plan.name}
+                                                            </h3>
+                                                            {plan.description && <p className="text-sm text-gray-500 mt-1">{plan.description}</p>}
                                                         </div>
-                                                        <div className="text-right">
-                                                            <div className={`font-extrabold text-xl ${formData.membershipTier === plan.id ? 'text-emerald-600' : 'text-gray-900'}`}>
-                                                                £{((formData.billingCycle === 'monthly' ? plan.monthlyPrice : plan.annualPrice) / 100).toFixed(2)}
+                                                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${formData.membershipTier === plan.id ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-300'}`}>
+                                                            {formData.membershipTier === plan.id && <CheckCircle className="w-4 h-4" />}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-100">
+                                                        <div className={`p-3 rounded-xl border transition-colors ${formData.billingCycle === 'monthly' && formData.membershipTier === plan.id ? 'border-emerald-500 bg-emerald-100' : 'border-gray-100 bg-white'}`}>
+                                                            <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Monthly</div>
+                                                            <div className={`font-extrabold text-2xl ${formData.billingCycle === 'monthly' && formData.membershipTier === plan.id ? 'text-emerald-700' : 'text-gray-900'}`}>
+                                                                £{(plan.monthlyPrice / 100).toFixed(2)}<span className="text-sm font-normal text-gray-500">/mo</span>
                                                             </div>
-                                                            <div className="text-xs text-gray-400">/{formData.billingCycle === 'monthly' ? 'mo' : 'yr'}</div>
+                                                        </div>
+
+                                                        <div className={`p-3 rounded-xl border transition-colors ${formData.billingCycle === 'annual' && formData.membershipTier === plan.id ? 'border-emerald-500 bg-emerald-100' : 'border-gray-100 bg-white'}`}>
+                                                            <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Annually</div>
+                                                            <div className={`font-extrabold text-2xl ${formData.billingCycle === 'annual' && formData.membershipTier === plan.id ? 'text-emerald-700' : 'text-gray-900'}`}>
+                                                                £{(plan.annualPrice / 100).toFixed(2)}<span className="text-sm font-normal text-gray-500">/yr</span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </button>

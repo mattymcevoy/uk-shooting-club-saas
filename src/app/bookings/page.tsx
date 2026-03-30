@@ -41,12 +41,72 @@ export default function MemberBookingsPortal() {
         }
     };
 
+    const [name, setName] = useState('');
+    const [phone, setPhone] = useState('');
+    const [email, setEmail] = useState('');
+    const [membershipNumber, setMembershipNumber] = useState('');
+    
+    // Auto-lookup hook triggers
+    const [isLookingUp, setIsLookingUp] = useState(false);
+    const [renewalWarning, setRenewalWarning] = useState('');
+
+    useEffect(() => {
+        const performLookup = async () => {
+            if (name.length > 3 && phone.length > 5 && email.includes('@')) {
+                setIsLookingUp(true);
+                try {
+                    const res = await fetch('/api/members/lookup', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, phone, email })
+                    });
+                    const data = await res.json();
+                    
+                    if (data.found && data.user.membershipNumber) {
+                        setMembershipNumber(data.user.membershipNumber);
+                        
+                        if (data.user.isExpired) {
+                            setRenewalWarning("Your membership has expired. We have just emailed you a renewal link!");
+                        } else {
+                            setRenewalWarning('');
+                        }
+                    }
+                } catch (e) {
+                    // silently fail the auto-lookup
+                } finally {
+                    setIsLookingUp(false);
+                }
+            }
+        };
+
+        const timeout = setTimeout(performLookup, 1000);
+        return () => clearTimeout(timeout);
+    }, [name, phone, email]);
+
+    const verifyManualMembership = async (forcedMemNum: string) => {
+        if (!forcedMemNum) return;
+        try {
+            const res = await fetch('/api/members/lookup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ membershipNumber: forcedMemNum })
+            });
+            const data = await res.json();
+            
+            if (data.found && data.user.isExpired) {
+                setRenewalWarning("Your membership has expired. We have just emailed you a renewal link!");
+            } else {
+                setRenewalWarning('');
+            }
+        } catch(e) {}
+    };
+
     const handleBook = async (e: React.FormEvent) => {
         e.preventDefault();
         setBookingStatus(null);
-        if (!date || !time || !selectedFacility) return;
+        if (!name || !email || !date || !time || !selectedFacility) return;
 
-        // Hardcode dummy user ID for testing since auth is uncompleted
+        // Using an ephemeral MOCK_USER_ID if they don't have a login
         const MOCK_USER_ID = 'cmh5g2n6k0000dummy1234';
 
         const startDateTime = new Date(`${date}T${time}:00`);
@@ -58,10 +118,12 @@ export default function MemberBookingsPortal() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    userId: MOCK_USER_ID,
+                    email,
+                    phone,
                     facilityId: selectedFacility,
                     startTime: startDateTime.toISOString(),
                     endTime: endDateTime.toISOString(),
+                    attendeeName: name 
                 }),
             });
 
@@ -79,7 +141,7 @@ export default function MemberBookingsPortal() {
                         setBookingStatus({ type: 'success', message: 'Booking confirmed (simulated stripe flow)!' });
                     }, 2000);
                 } else {
-                    setBookingStatus({ type: 'success', message: 'Free booking confirmed.' });
+                    setBookingStatus({ type: 'success', message: 'Booking confirmed.' });
                 }
             } else {
                 const text = await res.text();
@@ -103,6 +165,87 @@ export default function MemberBookingsPortal() {
 
             <div className="bg-white/80 backdrop-blur-xl shadow-2xl shadow-emerald-900/5 rounded-[2rem] p-10 border border-white/40">
                 <form onSubmit={handleBook} className="space-y-8">
+                    {/* Personal Details & Directory Interrogation */}
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">Your Details</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50/50 p-6 rounded-2xl border border-gray-100 shadow-sm">
+                            
+                            {/* Left Column */}
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Full Name *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-md font-medium shadow-inner focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                                        placeholder="e.g. John Doe"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Mobile Number *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={phone}
+                                        onChange={(e) => setPhone(e.target.value)}
+                                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-md font-medium shadow-inner focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                                        placeholder="e.g. +44 7700 900000"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Email Address *</label>
+                                    <input
+                                        type="email"
+                                        required
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-md font-medium shadow-inner focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                                        placeholder="e.g. john@example.com"
+                                    />
+                                </div>
+                            </div>
+                            
+                            {/* Right Column: Dynamic Membership Hook */}
+                            <div className="flex flex-col h-full bg-white p-6 border-2 border-emerald-500/10 rounded-xl shadow-sm relative overflow-hidden">
+                                {/* Subtle Background Graphic */}
+                                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-shield"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                </div>
+
+                                <h3 className="text-emerald-800 font-bold mb-1 items-center flex">
+                                    Membership Status
+                                    {isLookingUp && <span className="ml-2 text-xs font-medium text-emerald-500 animate-pulse">(Searching Directory...)</span>}
+                                </h3>
+                                <p className="text-gray-500 text-xs mb-4">
+                                    We inherently cross-reference the directory for your details. If you have an active Membership Number, it will auto-populate below.
+                                </p>
+
+                                <div className="mt-auto">
+                                    <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Membership Number (Optional)</label>
+                                    <input
+                                        type="text"
+                                        value={membershipNumber}
+                                        onChange={(e) => setMembershipNumber(e.target.value)}
+                                        onBlur={(e) => verifyManualMembership(e.target.value)}
+                                        className={`w-full px-4 py-3 bg-gray-50 border ${renewalWarning ? 'border-amber-400 focus:ring-amber-500/20 focus:border-amber-500' : 'border-emerald-200 focus:ring-emerald-500/20 focus:border-emerald-500'} rounded-xl text-md font-bold text-gray-700 shadow-inner outline-none transition-all`}
+                                        placeholder="Leave blank if not applicable"
+                                    />
+                                </div>
+                                
+                                {/* Renewal Notification Trigger */}
+                                {renewalWarning && (
+                                    <div className="mt-4 bg-amber-50 text-amber-800 border border-amber-200 p-3 rounded-lg text-sm font-semibold flex items-start animate-in fade-in zoom-in duration-300">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 shrink-0 mt-0.5"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                                        {renewalWarning}
+                                    </div>
+                                )}
+                            </div>
+
+                        </div>
+                    </div>
+
                     {/* Facility Selection */}
                     <div>
                         <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">Facility</label>

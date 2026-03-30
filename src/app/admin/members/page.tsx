@@ -99,6 +99,15 @@ export default function AdminMembersPage() {
 
     if (loading) return <div className="p-8 text-center text-emerald-400">Loading Members...</div>;
 
+    const groupedMembers = members.reduce((acc, member) => {
+        const tier = member.membershipTier || 'GUEST';
+        if (!acc[tier]) acc[tier] = [];
+        acc[tier].push(member);
+        return acc;
+    }, {} as Record<string, MemberWithSub[]>);
+
+    const tierOrder = ['VIP', 'FULL_MEMBER', 'PROBATIONARY', 'JUNIOR', 'GUEST'];
+
     return (
         <div className="p-8 max-w-7xl mx-auto">
             <div className="flex justify-between items-center mb-8">
@@ -112,39 +121,53 @@ export default function AdminMembersPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Members List */}
-                <div className="lg:col-span-2 space-y-4">
-                    {members.map((member) => (
-                        <div key={member.id} className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm flex justify-between items-center hover:border-emerald-500/50 transition-colors">
-                            <div className="flex items-center space-x-4">
-                                <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
-                                    <User size={24} />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-semibold text-white">{member.name}</h3>
-                                    <div className="flex items-center space-x-3 text-sm text-gray-400 mt-1">
-                                        <span className="flex items-center"><Mail size={14} className="mr-1" /> {member.email}</span>
-                                        <span className="flex items-center"><Shield size={14} className="mr-1" /> {member.membershipTier}</span>
-                                    </div>
-                                </div>
-                            </div>
+                <div className="lg:col-span-2 space-y-8">
+                    {tierOrder.map(tier => {
+                        const tierMembers = groupedMembers[tier];
+                        if (!tierMembers || tierMembers.length === 0) return null;
 
-                            <div className="flex flex-col items-end space-y-2">
-                                <div className="flex space-x-2">
-                                    {member.isLicenseHolder && <span className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs">License</span>}
-                                    {member.isRegisteredShooter && <span className="bg-purple-500/20 text-purple-400 px-2 py-1 rounded text-xs">Shooter</span>}
-                                    <span className={`px-2 py-1 rounded text-xs ${member.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                                        {member.status}
-                                    </span>
+                        return (
+                            <div key={tier}>
+                                <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-teal-500 mb-4 border-b border-emerald-500/20 pb-2">
+                                    {tier.replace('_', ' ')}
+                                </h2>
+                                <div className="space-y-4">
+                                    {tierMembers.map((member) => (
+                                        <div key={member.id} className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm flex justify-between items-center hover:border-emerald-500/50 transition-colors">
+                                            <div className="flex items-center space-x-4">
+                                                <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                                                    <User size={24} />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-lg font-semibold text-white">{member.name}</h3>
+                                                    <div className="flex items-center space-x-3 text-sm text-gray-400 mt-1">
+                                                        <span className="flex items-center"><Mail size={14} className="mr-1" /> {member.email}</span>
+                                                        <span className="flex items-center"><Shield size={14} className="mr-1" /> {member.membershipTier}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col items-end space-y-2">
+                                                <div className="flex space-x-2">
+                                                    {member.isLicenseHolder && <span className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs">License</span>}
+                                                    {member.isRegisteredShooter && <span className="bg-purple-500/20 text-purple-400 px-2 py-1 rounded text-xs">Shooter</span>}
+                                                    <span className={`px-2 py-1 rounded text-xs ${member.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                        {member.status}
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleEditClick(member)}
+                                                    className="text-emerald-400 hover:text-emerald-300 text-sm font-medium transition-colors"
+                                                >
+                                                    Edit Profile
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                                <button
-                                    onClick={() => handleEditClick(member)}
-                                    className="text-emerald-400 hover:text-emerald-300 text-sm font-medium transition-colors"
-                                >
-                                    Edit Profile
-                                </button>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
 
                 {/* Edit Panel Sidebar */}
