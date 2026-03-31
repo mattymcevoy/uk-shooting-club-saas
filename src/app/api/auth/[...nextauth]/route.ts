@@ -39,7 +39,7 @@ export const authOptions: NextAuthOptions = {
                     email: user.email,
                     name: user.name,
                     organizationId: user.organizationId,
-                    role: "MEMBER",
+                    role: (user as any).role,
                 };
             }
         }),

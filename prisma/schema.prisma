@@ -11,27 +11,49 @@ datasource db {
 // ==========================================
 
 model Organization {
-  id          String   @id @default(cuid())
-  name        String
-  logoUrl     String?
-  themeColor  String?  @default("#10b981") // emerald-500
-  
-  // B2B Stripe SaaS Subscription
-  stripeCustomerId       String? @unique
-  stripeSubscriptionId   String? @unique
-  subscriptionStatus     SubscriptionStatus @default(TRIALING)
+  id         String  @id @default(cuid())
+  name       String
+  logoUrl    String?
+  themeColor String? @default("#10b981") // emerald-500
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  users       User[]
-  facilities  Facility[]
-  events      Event[]
-  bookings    Booking[]
-  invoices    Invoice[]
-  subscriptions Subscription[]
+  // B2B Stripe SaaS Subscription
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+  subscriptionStatus   SubscriptionStatus @default(TRIALING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users           User[]
+  locations       Location[]
+  facilities      Facility[]
+  events          Event[]
+  bookings        Booking[]
+  invoices        Invoice[]
+  subscriptions   Subscription[]
   membershipPlans MembershipPlan[]
-  products    Product[]
+  products        Product[]
+  waitlistEntries WaitlistEntry[]
+}
+
+// ==========================================
+// Locations
+// ==========================================
+model Location {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name     String
+  address  String?
+  city     String?
+  postcode String?
+
+  facilities Facility[]
+  events     Event[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ==========================================
@@ -52,15 +74,31 @@ enum AccountStatus {
   IN_ARREARS
 }
 
+enum Role {
+  OWNER
+  ADMIN
+  COACH
+  RECEPTION
+  MEMBER
+  GUEST
+}
+
+enum WaitlistStatus {
+  PENDING
+  PROMOTED
+  EXPIRED
+  CANCELLED
+}
+
 model User {
-  id        String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Tenant Isolation
   email         String?   @unique
   emailVerified DateTime?
   image         String?
-  passwordHash  String?   // Added for CredentialsProvider fallback
-  
+  passwordHash  String? // Added for CredentialsProvider fallback
+
   // Custom Registration Properties
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -68,7 +106,7 @@ model User {
   // A User is unique per email *per organization* in our custom logic, 
   // but NextAuth standardly keys off the unique `email` field above for simplicity.
   // We remove the composite unique constraint to satisfy NextAuth's default adapter behavior.
-  
+
   name      String?
   phone     String?
   createdAt DateTime @default(now())
@@ -76,31 +114,32 @@ model User {
 
   // Membership & Financials
   membershipTier   MembershipTier @default(GUEST)
+  role             Role           @default(MEMBER)
   status           AccountStatus  @default(ACTIVE)
-  stripeCustomerId String?        
+  stripeCustomerId String?
 
   // New Membership Properties
-  isLicenseHolder      Boolean @default(false)
-  isRegisteredShooter  Boolean @default(false)
-  address              String?
-  certificateNumber    String?
-  membershipNumber     String? @unique
-  
+  isLicenseHolder     Boolean @default(false)
+  isRegisteredShooter Boolean @default(false)
+  address             String?
+  certificateNumber   String?
+  membershipNumber    String? @unique
+
   // File Upload References (Vercel Blob URLs)
-  profilePhotoUrl      String?
-  certificateUrl       String?
-  gunLicenseUrl        String?
+  profilePhotoUrl String?
+  certificateUrl  String?
+  gunLicenseUrl   String?
 
   // Document Access Control
   licenseAccessGranted   Boolean @default(false)
   licenseAccessRequested Boolean @default(false)
 
   // Security Hash for Membership QR
-  qrHash               String? @unique
+  qrHash String? @unique
 
   // E-Wallet (Digital Clays and Cash)
-  creditBalance        Int @default(5000) // Balance in pennies (£50 = 5000)
-  clayBalance          Int @default(100) // Balance in Digital Clays
+  creditBalance Int @default(5000) // Balance in pennies (£50 = 5000)
+  clayBalance   Int @default(100) // Balance in Digital Clays
 
   // Relations
   accounts      Account[]
@@ -109,6 +148,16 @@ model User {
   invoices      Invoice[]
   bookings      Booking[]
   walletTx      WalletTransaction[]
+
+  // Advanced SaaS Modules
+  waitlistEntries   WaitlistEntry[]
+  scores            Score[]
+  progressNotes     ProgressNote[]     @relation("MemberNotes")
+  authoredNotes     ProgressNote[]     @relation("CoachNotes")
+  coachSessions     CoachSession[]     @relation("CoachSessionMember")
+  coachingGiven     CoachSession[]     @relation("CoachSessionInstructor")
+  complianceRecords ComplianceRecord[]
+  incidentLogs      IncidentLog[]      @relation("IncidentReporter")
 }
 
 // ==========================================
@@ -116,18 +165,18 @@ model User {
 // ==========================================
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?  @db.Text
-  access_token       String?  @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?  @db.Text
-  session_state      String?
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -161,17 +210,17 @@ enum TransactionType {
 }
 
 model WalletTransaction {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   type        TransactionType
-  amount      Int      // Positives for deposits/refunds, negatives for usage
-  description String?  // e.g., "Reloaded 100 Clays", "Shot 50 Clays at Range A"
-  
+  amount      Int // Positives for deposits/refunds, negatives for usage
+  description String? // e.g., "Reloaded 100 Clays", "Shot 50 Clays at Range A"
+
   stripePaymentIntentId String? @unique
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 }
 
 enum SubscriptionStatus {
@@ -183,7 +232,7 @@ enum SubscriptionStatus {
 
 model Subscription {
   id     String @id @default(cuid())
-  userId String 
+  userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   organizationId String
@@ -197,7 +246,7 @@ model Subscription {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@unique([userId, organizationId])
 }
 
@@ -230,10 +279,14 @@ model Invoice {
 // ==========================================
 
 model Facility {
-  id          String  @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Multi-location Support
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id])
 
   name        String
   description String?
@@ -268,8 +321,8 @@ model Booking {
   facilityId String?
   facility   Facility? @relation(fields: [facilityId], references: [id])
 
-  eventId    String?
-  event      Event?    @relation(fields: [eventId], references: [id])
+  eventId String?
+  event   Event?  @relation(fields: [eventId], references: [id])
 
   startTime DateTime
   endTime   DateTime
@@ -277,18 +330,18 @@ model Booking {
 
   paymentIntentId String? // Stripe PaymentIntent for standalone bookings
   amountPaid      Int     @default(0)
-  
+
   // Event & Check-in Details
-  squadId         String?
-  squad           Squad?  @relation(fields: [squadId], references: [id])
-  attendeeName    String?
-  startStand      String?
-  prePaidClays    Int      @default(0)
-  prePaidLessons  Boolean  @default(false)
-  checkedInAt     DateTime?
+  squadId        String?
+  squad          Squad?    @relation(fields: [squadId], references: [id])
+  attendeeName   String?
+  startStand     String?
+  prePaidClays   Int       @default(0)
+  prePaidLessons Boolean   @default(false)
+  checkedInAt    DateTime?
 
   // Event specific QR hash
-  qrHash          String? @unique
+  qrHash String? @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -301,43 +354,50 @@ model Booking {
 // ==========================================
 
 model Event {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Multi-location Support
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id])
 
   title       String
   description String?
   date        DateTime
-  
-  signInTime  DateTime?
-  startTime   DateTime?
-  maxAttendees Int?
-  
-  eventType   String   @default("COMPETITION") // COMPETITION, CLAYMATE, CORPORATE_EVENT, RESTAURANT, SHOPPING_EVENT, OTHER
-  entryFee    Int      @default(0)             // Fee in pennies (E-Wallet credits)
-  
-  bookings    Booking[]
-  squads      Squad[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  signInTime   DateTime?
+  startTime    DateTime?
+  maxAttendees Int?
+
+  eventType String @default("COMPETITION") // COMPETITION, CLAYMATE, CORPORATE_EVENT, RESTAURANT, SHOPPING_EVENT, OTHER
+  entryFee  Int    @default(0) // Fee in pennies (E-Wallet credits)
+
+  bookings        Booking[]
+  squads          Squad[]
+  waitlistEntries WaitlistEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  scores    Score[]
 }
 
 model Squad {
-  id          String   @id @default(cuid())
-  eventId     String
-  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  
-  name        String   // e.g. "Squad 1"
-  startTime   DateTime?
-  maxCapacity Int      @default(6)
+  id      String @id @default(cuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  name         String // e.g. "Squad 1"
+  startTime    DateTime?
+  maxCapacity  Int       @default(6)
   startingTrap String? // E.g., Trap 1, Stand A, etc.
-  
-  bookings    Booking[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  bookings        Booking[]
+  waitlistEntries WaitlistEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ==========================================
@@ -345,23 +405,23 @@ model Squad {
 // ==========================================
 
 model Product {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  name         String
-  description  String?
-  price        Int      // in pennies
-  isDigital    Boolean  @default(false) // e.g. digital clays
-  claysAmount  Int?     // For digital top-up packages
+  name        String
+  description String?
+  price       Int // in pennies
+  isDigital   Boolean @default(false) // e.g. digital clays
+  claysAmount Int? // For digital top-up packages
 
-  isActive     Boolean  @default(true)
-  stock        Int      @default(0) // Inventory tracking for physical goods
-  expiresAt    DateTime? // User requested: "They must have expiry date."
+  isActive  Boolean   @default(true)
+  stock     Int       @default(0) // Inventory tracking for physical goods
+  expiresAt DateTime? // User requested: "They must have expiry date."
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ==========================================
@@ -369,39 +429,186 @@ model Product {
 // ==========================================
 
 model PlatformPlan {
-  id          String   @id @default(cuid())
-  name        String   // e.g "Standard SaaS License"
+  id          String  @id @default(cuid())
+  name        String // e.g "Standard SaaS License"
   description String?
-  
-  monthlyPrice Int      // Stored in pence (£199.00 = 19900)
-  annualPrice  Int      // Stored in pence (£1900.00 = 190000)
-  
+
+  monthlyPrice Int // Stored in pence (£199.00 = 19900)
+  annualPrice  Int // Stored in pence (£1900.00 = 190000)
+
   stripeMonthlyPriceId String?
   stripeAnnualPriceId  String?
-  
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model MembershipPlan {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  
-  name        String   // e.g "Full Member", "VIP", "Junior"
+
+  name        String // e.g "Full Member", "VIP", "Junior"
   description String?
-  
-  monthlyPrice Int      // Stored in pence (£45.00 = 4500)
-  annualPrice  Int      // Stored in pence (£450.00 = 45000)
-  
+
+  monthlyPrice Int // Stored in pence (£45.00 = 4500)
+  annualPrice  Int // Stored in pence (£450.00 = 45000)
+
   stripeMonthlyPriceId String?
   stripeAnnualPriceId  String?
-  
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([name, organizationId])
+}
+
+// ==========================================
+// Waitlists & Recurring Bookings
+// ==========================================
+
+model WaitlistEntry {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  eventId String?
+  event   Event?  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  squadId String?
+  squad   Squad?  @relation(fields: [squadId], references: [id], onDelete: Cascade)
+
+  status    WaitlistStatus @default(PENDING)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model RecurringTemplate {
+  id             String @id @default(cuid())
+  organizationId String
+
+  name       String
+  rrule      String // Standard RRULE string (e.g., "FREQ=WEEKLY;BYDAY=MO")
+  targetType String // "EVENT", "SQUAD", "LANE_BLOCK"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ==========================================
+// Disciplines & Scoring Module
+// ==========================================
+
+model Discipline {
+  id             String  @id @default(cuid())
+  organizationId String
+  name           String // "Trap", "Skeet", "Sporting", etc.
+  description    String?
+
+  scores Score[]
+}
+
+model Score {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  disciplineId String
+  discipline   Discipline @relation(fields: [disciplineId], references: [id], onDelete: Cascade)
+
+  eventId String?
+  event   Event?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  hits         Int
+  totalTargets Int
+  handicap     Float? // Optional handicap adjusting the score
+  season       String? // e.g. "Summer 2026"
+
+  createdAt DateTime @default(now())
+}
+
+// ==========================================
+// Coaching & Instruction Module
+// ==========================================
+
+model LessonPackage {
+  id             String @id @default(cuid())
+  organizationId String
+
+  name         String
+  description  String?
+  price        Int // in pence
+  lessonsCount Int // number of sessions in package
+
+  createdAt DateTime @default(now())
+}
+
+model CoachSession {
+  id       String @id @default(cuid())
+  memberId String
+  member   User   @relation("CoachSessionMember", fields: [memberId], references: [id], onDelete: Cascade)
+
+  coachId String
+  coach   User   @relation("CoachSessionInstructor", fields: [coachId], references: [id], onDelete: Cascade)
+
+  startTime DateTime
+  endTime   DateTime
+  notes     String?  @db.Text
+
+  createdAt DateTime @default(now())
+}
+
+model ProgressNote {
+  id       String @id @default(cuid())
+  memberId String
+  member   User   @relation("MemberNotes", fields: [memberId], references: [id], onDelete: Cascade)
+
+  coachId String
+  coach   User   @relation("CoachNotes", fields: [coachId], references: [id], onDelete: Cascade)
+
+  content String   @db.Text
+  date    DateTime @default(now())
+}
+
+// ==========================================
+// Compliance & Incident Logs
+// ==========================================
+
+model ComplianceRecord {
+  id             String @id @default(cuid())
+  userId         String
+  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+
+  type          String // "GUN_LICENSE", "SAFETY_CERT", "INSURANCE"
+  documentUrl   String?
+  issueDate     DateTime?
+  expiryDate    DateTime
+  isApproved    Boolean   @default(false)
+  remindersSent Int       @default(0) // Logic track: "Sent 30-day reminder"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model IncidentLog {
+  id             String @id @default(cuid())
+  organizationId String
+
+  reporterId String
+  reporter   User   @relation("IncidentReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  date        DateTime
+  type        String // "SAFETY_BREACH", "EQUIPMENT_FAULT", "RCO_NOTE"
+  severity    String // "LOW", "MEDIUM", "HIGH", "CRITICAL"
+  description String   @db.Text
+  actionTaken String?  @db.Text
+
+  createdAt DateTime @default(now())
 }

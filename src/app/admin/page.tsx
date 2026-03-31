@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Target, Users, CreditCard, Calendar, Settings, QrCode, UserPlus, ShoppingBag } from 'lucide-react';
+import { Target, Users, CreditCard, Calendar, Settings, QrCode, UserPlus, ShoppingBag, ShieldAlert, GraduationCap, FileCheck } from 'lucide-react';
 
 export default function AdminDashboardPage() {
 
@@ -45,6 +45,14 @@ export default function AdminDashboardPage() {
             bgGlow: 'group-hover:bg-purple-500/10'
         },
         {
+            title: 'Waitlist Queues',
+            description: 'Check automated overflow queues for fully booked events and review queue jump statuses.',
+            href: '/admin/waitlists',
+            icon: Target,
+            color: 'bg-orange-500/20 text-orange-400 border-orange-500/30 hover:border-orange-500',
+            bgGlow: 'group-hover:bg-orange-500/10'
+        },
+        {
             title: 'QR Staff Scanner',
             description: 'Open the smartphone-ready webcam portal to physically verify attending shooter passes and identities.',
             href: '/admin/scanner',
@@ -67,6 +75,38 @@ export default function AdminDashboardPage() {
             icon: ShoppingBag,
             color: 'bg-orange-500/20 text-orange-400 border-orange-500/30 hover:border-orange-500',
             bgGlow: 'group-hover:bg-orange-500/10'
+        },
+        {
+            title: 'Incident & Safety Logs',
+            description: 'Access the Range Conducting Officer logs to track health, safety, and equipment faults securely.',
+            href: '/admin/incidents',
+            icon: ShieldAlert,
+            color: 'bg-red-500/20 text-red-400 border-red-500/30 hover:border-red-500',
+            bgGlow: 'group-hover:bg-red-500/10'
+        },
+        {
+            title: 'Compliance Center',
+            description: 'Track expiring gun licenses and approve medical certificates with automated 30-day email reminders.',
+            href: '/admin/compliance',
+            icon: FileCheck,
+            color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30 hover:border-cyan-500',
+            bgGlow: 'group-hover:bg-cyan-500/10'
+        },
+        {
+            title: 'Coach Dashboard',
+            description: 'Review instructor lesson schedules, view pupil progress, and embed internal milestone notes.',
+            href: '/coach',
+            icon: GraduationCap,
+            color: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30 hover:border-indigo-500',
+            bgGlow: 'group-hover:bg-indigo-500/10'
+        },
+        {
+            title: 'Book Coaching',
+            description: 'Launch the member-facing portal to schedule dedicated 1-on-1 time slots with certified instructors.',
+            href: '/dashboard/coaching',
+            icon: GraduationCap,
+            color: 'bg-pink-500/20 text-pink-400 border-pink-500/30 hover:border-pink-500',
+            bgGlow: 'group-hover:bg-pink-500/10'
         }
     ];
 

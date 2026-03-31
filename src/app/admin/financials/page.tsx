@@ -49,7 +49,17 @@ export default async function FinancialDashboard() {
 
     return (
         <div className="p-8 max-w-7xl mx-auto font-sans">
-            <h1 className="text-4xl font-extrabold mb-8 text-gray-900 tracking-tight">Financial Overview</h1>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Financial Overview</h1>
+                
+                {/* Floating Export Menu Bar */}
+                <div className="flex space-x-3 bg-white/80 p-2 rounded-xl shadow-lg border border-gray-200 items-center">
+                    <span className="text-xs font-bold text-gray-400 pl-2 pr-1 uppercase">Exports:</span>
+                    <a href="/api/financials/export/xero" className="px-4 py-2 bg-[#13B5EA] text-white rounded-lg text-sm font-bold hover:bg-[#10a1d1] shadow transition">Xero CSV</a>
+                    <a href="/api/financials/export/quickbooks" className="px-4 py-2 bg-[#2CA01C] text-white rounded-lg text-sm font-bold hover:bg-[#258b16] shadow transition">QuickBooks CSV</a>
+                    <a href="/api/financials/export/vat" className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 shadow transition">VAT Liability</a>
+                </div>
+            </div>
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
