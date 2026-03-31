@@ -1,27 +1,29 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentOrganizationId } from '@/lib/tenant';
 import { MembershipTier, AccountStatus } from '@prisma/client';
+import { getRequestContext } from '@/lib/authz';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
     try {
+        const { error, context } = await getRequestContext({ requireAdmin: true });
+        if (error || !context) return error!;
+
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
 
         if (id) {
-            const user = await prisma.user.findUnique({
-                where: { id },
+            const user = await prisma.user.findFirst({
+                where: { id, organizationId: context.user.organizationId },
                 include: { subscriptions: true }
             });
             if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
             return NextResponse.json(user);
         }
 
-        const organizationId = await getCurrentOrganizationId();
         const members = await prisma.user.findMany({
-            where: { organizationId },
+            where: { organizationId: context.user.organizationId },
             orderBy: { createdAt: 'desc' },
             include: {
                 subscriptions: {
@@ -39,6 +41,9 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
     try {
+        const { error, context } = await getRequestContext({ requireAdmin: true });
+        if (error || !context) return error!;
+
         const body = await request.json();
         const { id, membershipTier, status, isLicenseHolder, isRegisteredShooter, name, phone } = body;
 
@@ -46,8 +51,17 @@ export async function PUT(request: Request) {
             return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
         }
 
+        const existingUser = await prisma.user.findFirst({
+            where: { id, organizationId: context.user.organizationId },
+            select: { id: true }
+        });
+
+        if (!existingUser) {
+            return NextResponse.json({ error: 'User not found in your organization' }, { status: 404 });
+        }
+
         const updatedUser = await prisma.user.update({
-            where: { id },
+            where: { id: existingUser.id },
             data: {
                 name,
                 phone,

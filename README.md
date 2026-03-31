@@ -5,6 +5,10 @@ A comprehensive, vibrant, and fully responsive management platform for UK shooti
 ## Features Built
 - **Membership & Financials**: Recurring Stripe billing subscriptions, member tracking, invoice history, and an overarching Admin revenue dashboard.
 - **Facility Bookings**: Self-service member booking portal mapped to dynamic facility capacities, member pricing rates, and time-slot scheduling.
+- **Admin Security & RBAC**: Organization-scoped admin API authorization with role-gated access controls for sensitive operations.
+- **Event Waitlist**: Automatic and manual waitlist support when events are full.
+- **Operations Modules**: Recurring templates, scoring endpoints, coaching sessions, compliance documents, incidents, campaigns, and analytics overview APIs.
+- **Data Protection & GDPR**: Privacy policy pages plus user export and privacy-request APIs for access/erasure workflows.
 - **Premium Design**: Vanilla CSS utilizing deep emerald gradients, modern glassmorphism, and responsive interactivity.
 
 ## Deployment Instructions

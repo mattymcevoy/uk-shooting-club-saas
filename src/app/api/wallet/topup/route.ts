@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { stripe } from '@/lib/stripe';
+import { getStripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(req: Request) {
     try {
+        const stripe = getStripe();
         const session = await getServerSession(authOptions);
 
         if (!session || !session.user || !session.user.email) {

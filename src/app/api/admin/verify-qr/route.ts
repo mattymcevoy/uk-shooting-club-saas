@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getRequestContext } from '@/lib/authz';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
     try {
+        const { error, context } = await getRequestContext({ requireAdmin: true });
+        if (error || !context) return error!;
+
         const body = await req.json();
         // Fallback to checking the `qrHash` against the User if the payload is raw text
         // Or unpack the JSON payload from the dashboard
@@ -26,7 +30,7 @@ export async function POST(req: Request) {
             where: { qrHash: qrHashToSearch },
         });
 
-        if (!user) {
+        if (!user || user.organizationId !== context.user.organizationId) {
             return NextResponse.json({ error: 'Invalid QR Code. No member found.' }, { status: 404 });
         }
 
@@ -39,6 +43,7 @@ export async function POST(req: Request) {
         const recentBookings = await prisma.booking.findMany({
             where: {
                 userId: user.id,
+                organizationId: context.user.organizationId,
                 startTime: {
                     gte: twoDaysAgo,
                     lte: twoDaysFromNow,

@@ -1,6 +1,6 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe';
+import { getStripe, isStripeConfigured } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import Stripe from 'stripe';
 import { sendEmail, WalletTopUpEmail } from '@/lib/emails/mailer';
@@ -71,6 +71,11 @@ const handleSubscriptionEvent = async (event: Stripe.Event) => {
 };
 
 export async function POST(req: Request) {
+    if (!isStripeConfigured()) {
+        return new NextResponse('Stripe is not configured on this deployment.', { status: 503 });
+    }
+
+    const stripe = getStripe();
     const body = await req.text();
     const signature = (await headers()).get('stripe-signature') as string;
 

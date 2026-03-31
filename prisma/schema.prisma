@@ -31,6 +31,16 @@ model Organization {
   invoices    Invoice[]
   subscriptions Subscription[]
   membershipPlans MembershipPlan[]
+  waitlistEntries WaitlistEntry[]
+  locations   Location[]
+  recurringTemplates RecurringBookingTemplate[]
+  leaderboardSeasons LeaderboardSeason[]
+  lessonPackages LessonPackage[]
+  coachingSessions CoachingSession[]
+  complianceDocuments ComplianceDocument[]
+  incidents IncidentLog[]
+  commCampaigns CommunicationCampaign[]
+  privacyRequests PrivacyRequest[]
 }
 
 // ==========================================
@@ -49,6 +59,14 @@ enum AccountStatus {
   ACTIVE
   SUSPENDED
   IN_ARREARS
+}
+
+enum UserRole {
+  MEMBER
+  COACH
+  RECEPTION
+  ADMIN
+  OWNER
 }
 
 model User {
@@ -70,6 +88,7 @@ model User {
   
   name      String?
   phone     String?
+  role      UserRole @default(MEMBER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -106,6 +125,17 @@ model User {
   invoices      Invoice[]
   bookings      Booking[]
   walletTx      WalletTransaction[]
+  waitlistEntries WaitlistEntry[]
+  recurringTemplates RecurringBookingTemplate[] @relation("TemplateOwner")
+  scores        DisciplineScore[]
+  coachedSessions CoachingSession[] @relation("MemberCoaching")
+  instructorSessions CoachingSession[] @relation("CoachSessions")
+  coachingNotes CoachingNote[]
+  complianceDocuments ComplianceDocument[]
+  incidentsReported IncidentLog[] @relation("IncidentReporter")
+  incidentsAssigned IncidentLog[] @relation("IncidentAssignee")
+  privacyRequests PrivacyRequest[]
+  commCampaigns CommunicationCampaign[] @relation("CampaignAuthor")
 }
 
 // ==========================================
@@ -231,6 +261,8 @@ model Facility {
   
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  locationId     String?
+  location       Location? @relation(fields: [locationId], references: [id])
 
   name        String
   description String?
@@ -293,6 +325,24 @@ model Booking {
   @@index([facilityId, startTime, endTime])
 }
 
+model RecurringBookingTemplate {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ownerId        String
+  owner          User     @relation("TemplateOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  facilityId     String
+  facility       Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  title          String
+  weekday        Int      // 0 = Sunday ... 6 = Saturday
+  startHour      Int
+  durationMinutes Int
+  maxOccurrences Int?     // Optional safety cap
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
 // ==========================================
 // Event & CRM Models
 // ==========================================
@@ -316,9 +366,182 @@ model Event {
   
   bookings    Booking[]
   squads      Squad[]
+  waitlistEntries WaitlistEntry[]
+  scores DisciplineScore[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model LeaderboardSeason {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  startsAt       DateTime
+  endsAt         DateTime
+  discipline     String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  scores         DisciplineScore[]
+}
+
+model DisciplineScore {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventId        String?
+  event          Event?   @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  seasonId       String?
+  season         LeaderboardSeason? @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+  discipline     String
+  score          Float
+  handicap       Float?
+  recordedAt     DateTime @default(now())
+  notes          String?
+}
+
+model LessonPackage {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  sessionCount   Int
+  price          Int
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  sessions       CoachingSession[]
+}
+
+model CoachingSession {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  packageId      String?
+  package        LessonPackage? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  coachId        String?
+  coach          User?    @relation("CoachSessions", fields: [coachId], references: [id], onDelete: SetNull)
+  memberId       String
+  member         User     @relation("MemberCoaching", fields: [memberId], references: [id], onDelete: Cascade)
+  scheduledAt    DateTime
+  durationMinutes Int
+  status         String   @default("SCHEDULED")
+  notes          CoachingNote[]
+}
+
+model CoachingNote {
+  id              String   @id @default(cuid())
+  coachingSessionId String
+  coachingSession CoachingSession @relation(fields: [coachingSessionId], references: [id], onDelete: Cascade)
+  authorId        String
+  author          User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body            String
+  createdAt       DateTime @default(now())
+}
+
+model ComplianceDocument {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           String   // CERTIFICATE, LICENSE, INSURANCE
+  reference      String?
+  expiresAt      DateTime?
+  status         String   @default("PENDING")
+  reminderSentAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model IncidentLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title          String
+  severity       String   @default("LOW")
+  category       String   @default("SAFETY")
+  details        String?
+  reportedById   String?
+  reportedBy     User?    @relation("IncidentReporter", fields: [reportedById], references: [id], onDelete: SetNull)
+  assignedToId   String?
+  assignedTo     User?    @relation("IncidentAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  occurredAt     DateTime @default(now())
+  resolvedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model CommunicationCampaign {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdById    String?
+  createdBy      User?    @relation("CampaignAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  name           String
+  audienceFilter String?
+  channel        String   @default("EMAIL")
+  status         String   @default("DRAFT")
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model PrivacyRequest {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestType    String   // ACCESS_EXPORT, ERASURE, RECTIFICATION
+  status         String   @default("OPEN")
+  notes          String?
+  requestedAt    DateTime @default(now())
+  completedAt    DateTime?
+}
+
+model Location {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  address        String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  facilities     Facility[]
+}
+
+enum WaitlistStatus {
+  WAITING
+  OFFERED
+  CONFIRMED
+  EXPIRED
+  CANCELLED
+}
+
+model WaitlistEntry {
+  id             String   @id @default(cuid())
+  eventId        String
+  event          Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  requestedTickets Int @default(1)
+  status        WaitlistStatus @default(WAITING)
+  notes         String?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([eventId, userId])
+  @@index([eventId, status, createdAt])
 }
 
 model Squad {

@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { stripe } from '@/lib/stripe';
+import { getStripe } from '@/lib/stripe';
 import crypto from 'crypto';
 import { getCurrentOrganizationId } from '@/lib/tenant';
 
 export async function POST(req: Request) {
     try {
+        const stripe = getStripe();
         const body = await req.json();
         const {
             name, email, phone, address, certificateNumber,

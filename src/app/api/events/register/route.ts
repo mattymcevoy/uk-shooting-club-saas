@@ -1,21 +1,16 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { getCurrentOrganizationId } from '@/lib/tenant';
 import { sendEmail, BookingConfirmationEmail } from '@/lib/emails/mailer';
+import { getRequestContext } from '@/lib/authz';
 
 export async function POST(req: Request) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user?.email) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        const organizationId = await getCurrentOrganizationId();
+        const { error, context } = await getRequestContext();
+        if (error || !context) return error!;
+        const organizationId = context.user.organizationId;
         const body = await req.json();
         // tickets should be an array of: { squadId?: string, attendeeName?: string }
-        const { eventId, paymentType, tickets = [{}] } = body;
+        const { eventId, paymentType, tickets = [{}], joinWaitlist = false } = body;
 
         if (!eventId || !paymentType) {
             return NextResponse.json({ error: 'Event ID and Payment Type are required' }, { status: 400 });
@@ -24,10 +19,13 @@ export async function POST(req: Request) {
         if (tickets.length > 12) {
             return NextResponse.json({ error: 'You cannot purchase more than 12 tickets at a time.' }, { status: 400 });
         }
+        if (!Array.isArray(tickets) || tickets.length < 1) {
+            return NextResponse.json({ error: 'At least one ticket is required.' }, { status: 400 });
+        }
 
         // 1. Get User
         const user = await prisma.user.findFirst({
-            where: { email: session.user.email, organizationId }
+            where: { id: context.user.id, organizationId }
         });
 
         if (!user) {
@@ -44,8 +42,46 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Event not found' }, { status: 404 });
         }
 
+        if (event.organizationId !== organizationId) {
+            return NextResponse.json({ error: 'Event not available for your organization.' }, { status: 403 });
+        }
+
         if (event.maxAttendees && event._count.bookings + tickets.length > event.maxAttendees) {
-            return NextResponse.json({ error: `Not enough space left. Only ${event.maxAttendees - event._count.bookings} spots remaining.` }, { status: 400 });
+            if (joinWaitlist) {
+                const waitlist = await prisma.waitlistEntry.upsert({
+                    where: {
+                        eventId_userId: {
+                            eventId: event.id,
+                            userId: user.id
+                        }
+                    },
+                    create: {
+                        eventId: event.id,
+                        userId: user.id,
+                        organizationId,
+                        requestedTickets: tickets.length,
+                        status: 'WAITING',
+                        notes: `Auto-waitlisted after full event check (${tickets.length} requested).`
+                    },
+                    update: {
+                        requestedTickets: tickets.length,
+                        status: 'WAITING',
+                        notes: `Updated waitlist request (${tickets.length} requested).`
+                    }
+                });
+
+                return NextResponse.json({
+                    success: true,
+                    waitlisted: true,
+                    waitlistId: waitlist.id,
+                    message: 'Event is currently full. You have been added to the waitlist.'
+                }, { status: 202 });
+            }
+
+            return NextResponse.json({
+                error: `Not enough space left. Only ${event.maxAttendees - event._count.bookings} spots remaining.`,
+                canJoinWaitlist: true
+            }, { status: 400 });
         }
 
         // 3. Verify Squad capacities before processing
